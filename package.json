@@ -13,7 +13,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "prisma-generate:dev": "npx prisma migrate dev --name init --preview-feature"
+    "prisma-generate:dev": "npx prisma migrate dev --name init --preview-feature",
+    "prisma-generate:prod": "npx prisma migrate deploy --preview-feature"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.13",
