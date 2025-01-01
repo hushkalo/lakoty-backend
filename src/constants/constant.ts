@@ -29,3 +29,4 @@ export const MANAGER_ID = Number(process.env.MANAGER_ID);
 export const SOURCE_ID = Number(process.env.SOURCE_ID);
 export const KEY_CRM_API = process.env.KEY_CRM_API;
 export const CRM_API_KEY = process.env.CRM_API_KEY;
+export const CORS_ORIGIN = process.env.CORS_ORIGIN;

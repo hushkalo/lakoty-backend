@@ -5,6 +5,7 @@ import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import {
   BUILD_IMAGES_DIRECTORY_PATH,
+  CORS_ORIGIN,
   MAIN_STATIC_DIRECTORY_NAME,
   MAIN_STATIC_DIRECTORY_PATH,
 } from "./constants/constant";
@@ -33,8 +34,8 @@ async function bootstrap() {
     mkdirSync(productImagesDir);
   }
   app.enableCors({
-    origin: ["http://localhost:5173"],
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    origin: ["http://localhost:5173", CORS_ORIGIN],
+    methods: "POST",
     preflightContinue: false,
     optionsSuccessStatus: 204,
     credentials: true,
