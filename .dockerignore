@@ -1,0 +1,9 @@
+node_modules
+dist
+static
+.idea
+README.md
+combine.log
+.prettierrc
+.eslintrc.js
+Makefile
