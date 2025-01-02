@@ -44,5 +44,11 @@ create-docker-container:
 generate-prisma:
 	@echo "Generating prisma client..."
 	@npx prisma generate
+create-docker-db:
+	@echo "Creating database container..."
+	@docker-compose -f docker-compose.db.yml up -d
+create-docker-app:
+	@echo "Creating redis container..."
+	@docker-compose -f docker-compose.app.yml up -d
 
-.PHONY: build format start start-dev start-debug start-prod lint migrate-dev migrate-prod migrate-seed create-docker-container
+.PHONY: build format start start-dev start-debug start-prod lint migrate-dev migrate-prod migrate-seed create-docker-container generate-prisma create-docker-db create-docker-app

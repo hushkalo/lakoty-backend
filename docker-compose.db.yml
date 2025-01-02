@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:13-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    environment:
+      TZ: Europe/Kiev
+    networks:
+      - my_network
+
+networks:
+  my_network:
+    driver: bridge
+volumes:
+  postgres_data:
