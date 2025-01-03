@@ -16,15 +16,6 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false,
-    "moduleResolution": "node",
-    "paths": {
-      "@/*": [
-        "apps/*"
-      ],
-      "@shared/*": [
-        "shared/*"
-      ]
-    }
+    "noFallthroughCasesInSwitch": false
   }
 }

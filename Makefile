@@ -1,6 +1,6 @@
-build-course:
+build:
 	@echo "Building project..."
-	@npm run build --workspace=apps/course
+	@npm run build
 
 format:
 	@echo "Formatting code..."

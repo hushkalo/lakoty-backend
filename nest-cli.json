@@ -1,44 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/lakoty-backend/src",
+  "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
     "plugins": [
       "@nestjs/swagger"
-    ],
-    "webpack": true,
-    "tsConfigPath": "apps/lakoty-backend/tsconfig.app.json"
-  },
-  "monorepo": true,
-  "root": "apps/lakoty-backend",
-  "projects": {
-    "course": {
-      "type": "application",
-      "root": "apps/course",
-      "entryFile": "main",
-      "sourceRoot": "apps/course/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/course/tsconfig.app.json"
-      }
-    },
-    "store": {
-      "type": "application",
-      "root": "apps/store",
-      "entryFile": "main",
-      "sourceRoot": "apps/store/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/store/tsconfig.app.json"
-      }
-    },
-    "config": {
-      "type": "library",
-      "root": "libs/config",
-      "entryFile": "index",
-      "sourceRoot": "libs/config/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/config/tsconfig.lib.json"
-      }
-    }
+    ]
   }
 }
