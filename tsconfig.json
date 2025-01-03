@@ -19,8 +19,12 @@
     "noFallthroughCasesInSwitch": false,
     "moduleResolution": "node",
     "paths": {
-      "@/*": ["apps/*"],
-      "@shared/*": ["apps/shared/*"]
+      "@/*": [
+        "apps/*"
+      ],
+      "@shared/*": [
+        "shared/*"
+      ]
     }
   }
 }

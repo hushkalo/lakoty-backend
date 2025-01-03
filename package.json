@@ -2,19 +2,25 @@
   "name": "lakoty-backend",
   "version": "1.8.1",
   "description": "",
-  "author": "",
+  "author": "Herman Ushkalo",
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "libs/*"
+    ]
+  },
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "prebuild": "rimraf dist",
     "build": "nest build",
+    "monorepo:install": "npm install --workspace=course && npm install --workspace=store",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start": "dotenv -e .env cross-env NODE_ENV=local nest start store",
     "start:dev": "cross-env NODE_ENV=development nest start store --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/src/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "prisma-generate:dev": "npx prisma migrate dev --name init --preview-feature",
-    "prisma-generate:prod": "npx prisma migrate deploy --preview-feature"
+    "start:prod": "node dist/src/main"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.13",
@@ -91,8 +97,12 @@
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
     "roots": [
-      "<rootDir>/apps/"
-    ]
+      "<rootDir>/apps/",
+      "<rootDir>/libs/"
+    ],
+    "moduleNameMapper": {
+      "^@app/config(|/.*)$": "<rootDir>/libs/config/src/$1"
+    }
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
