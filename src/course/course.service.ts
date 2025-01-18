@@ -29,7 +29,7 @@ export class CourseService {
           products: [
             {
               sku: null,
-              price: "3999",
+              price: "4200",
               quantity: 1,
               name: "Курс по товарці",
             },
