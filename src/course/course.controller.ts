@@ -2,7 +2,7 @@ import { Body, Controller, Post } from "@nestjs/common";
 import { CourseService } from "./course.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { Throttle } from "@nestjs/throttler";
-import { HALF_HOUR_IN_MILLISECONDS } from "../constants/constant";
+import { HALF_HOUR_IN_MILLISECONDS } from "../configuration";
 
 @Controller("course")
 export class CourseController {

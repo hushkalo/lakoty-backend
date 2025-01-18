@@ -5,7 +5,7 @@ import {
   KEY_CRM_API,
   MANAGER_ID,
   SOURCE_ID,
-} from "../constants/constant";
+} from "../configuration";
 
 @Injectable()
 export class CourseService {
@@ -20,9 +20,9 @@ export class CourseService {
         body: JSON.stringify({
           manager_id: MANAGER_ID,
           source_id: SOURCE_ID,
-          buyer_comment: `Тип мессенджера: ${data.messengerType}, Мессенджер: ${data.messenger}`,
+          buyer_comment: `Ім'я: ${data.firstName} Тип мессенджера: ${data.messengerType}, Мессенджер: ${data.messenger}`,
           buyer: {
-            full_name: `${data.firstName}`,
+            full_name: `${data.messenger}`,
             email: "",
             phone: data.phone,
           },

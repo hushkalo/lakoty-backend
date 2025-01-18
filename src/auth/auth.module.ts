@@ -4,7 +4,7 @@ import { AdminAuthController } from "./admin.auth.controller";
 import { UserModule } from "../user/user.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { JwtModule } from "@nestjs/jwt";
-import { JWT_CONFIG } from "../constants/constant";
+import { JWT_CONFIG } from "../configuration";
 import { JwtStrategy } from "./jwt.strategy";
 import { PassportModule } from "@nestjs/passport";
 

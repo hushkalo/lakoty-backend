@@ -11,7 +11,7 @@ import { ECodeErrors } from "../enums/code-errors.enum";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginResponseDto } from "./dto/responses.dto";
-import { JWT_CONFIG } from "../constants/constant";
+import { JWT_CONFIG } from "../configuration";
 import { comparePassword } from "../utils/bcrypt.util";
 
 @Injectable()
