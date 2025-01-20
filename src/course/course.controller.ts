@@ -1,16 +1,18 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post } from "@nestjs/common";
 import { CourseService } from "./course.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
-import { Throttle } from "@nestjs/throttler";
-import { HALF_HOUR_IN_MILLISECONDS } from "../configuration";
 
 @Controller("course")
 export class CourseController {
   constructor(private readonly courseService: CourseService) {}
 
-  @Throttle({ default: { limit: 3, ttl: HALF_HOUR_IN_MILLISECONDS } })
   @Post("create")
   createOrder(@Body() data: CreateOrderDto) {
     return this.courseService.create(data);
+  }
+
+  @Get("quantity")
+  getCourseQuantity() {
+    return this.courseService.getCourseQuantity();
   }
 }

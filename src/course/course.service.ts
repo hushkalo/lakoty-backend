@@ -6,12 +6,13 @@ import {
   MANAGER_ID,
   SOURCE_ID,
 } from "../configuration";
+import { TKeyCRMOrder } from "../type/response-data.type";
 
 @Injectable()
 export class CourseService {
   async create(data: CreateOrderDto) {
     try {
-      const response = await fetch(KEY_CRM_API, {
+      const response = await fetch(`${KEY_CRM_API}/order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -43,6 +44,29 @@ export class CourseService {
       return {
         status: "success",
         message: "Order created successfully",
+      };
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
+  async getCourseQuantity() {
+    try {
+      const response = await fetch(`${KEY_CRM_API}/products/360`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${CRM_API_KEY}`,
+        },
+      });
+      if (!response.ok) {
+        console.log(response);
+        throw new InternalServerErrorException("Failed to create order");
+      }
+      const data = (await response.json()) as TKeyCRMOrder;
+      return {
+        quantity: data.quantity,
       };
     } catch (error) {
       console.log(error);
