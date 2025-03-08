@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import {
   CRM_API_KEY,
-  KEY_CRM_API,
+  CRM_API_URL,
   MANAGER_ID,
   SOURCE_ID,
 } from "../configuration";
@@ -12,7 +12,7 @@ import { TKeyCRMOrder } from "../type/response-data.type";
 export class CourseService {
   async create(data: CreateOrderDto) {
     try {
-      const response = await fetch(`${KEY_CRM_API}/order`, {
+      const response = await fetch(`${CRM_API_URL}/order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -53,7 +53,7 @@ export class CourseService {
 
   async getCourseQuantity() {
     try {
-      const response = await fetch(`${KEY_CRM_API}/products/360`, {
+      const response = await fetch(`${CRM_API_URL}/products/360`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

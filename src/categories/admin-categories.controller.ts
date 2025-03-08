@@ -111,7 +111,7 @@ export class AdminCategoriesController {
   }
 
   @UseGuards(JwtGuard)
-  @Delete("/delete/:id")
+  @Delete("delete/:id")
   async deleteCategory(@Param("id") id: string): Promise<CategoryModel> {
     return this.categoryService.remove({
       id,

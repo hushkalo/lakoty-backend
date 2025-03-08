@@ -38,6 +38,9 @@ export class CreateProductDto {
   @ApiProperty()
   productSizes: ProductSize[];
 
+  @ApiProperty()
+  isCreateOnCrm: boolean;
+
   @ApiProperty({ required: false })
   createdAt?: Date | string;
 

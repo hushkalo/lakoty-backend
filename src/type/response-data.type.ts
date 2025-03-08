@@ -31,3 +31,16 @@ export type TKeyCRMOrder = {
   purchased_price: number;
   sources: any[];
 };
+
+export type TKeyCRMAddFile = {
+  id: number;
+  size: number;
+  file_name: string;
+  directory: string;
+  extension: string;
+  original_file_name: string;
+  mime_type: string;
+  created_at: string;
+  updated_at: string;
+  url: string;
+};

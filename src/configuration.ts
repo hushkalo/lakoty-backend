@@ -1,3 +1,5 @@
+import * as console from "node:console";
+
 require("dotenv").config();
 import { instance } from "./logger/winston.logger";
 
@@ -13,7 +15,7 @@ export const HALF_HOUR_IN_MILLISECONDS = HOUR_IN_MILLISECONDS / 2;
 
 export const MANAGER_ID = Number(process.env.MANAGER_ID);
 export const SOURCE_ID = Number(process.env.SOURCE_ID);
-export const KEY_CRM_API = process.env.KEY_CRM_API;
+export const CRM_API_URL = process.env.CRM_API_URL;
 export const CRM_API_KEY = process.env.CRM_API_KEY;
 export const CORS_ORIGIN = process.env.CORS_ORIGIN;
 export const BASE_PORT = process.env.BASE_PORT || 3000;
@@ -34,7 +36,7 @@ export function validateConfiguration() {
   );
   checkVariable("MANAGER_ID", MANAGER_ID);
   checkVariable("SOURCE_ID", SOURCE_ID);
-  checkVariable("KEY_CRM_API", KEY_CRM_API);
+  checkVariable("CRM_API_URL", CRM_API_URL);
   checkVariable("CRM_API_KEY", CRM_API_KEY);
   checkVariable("CORS_ORIGIN", CORS_ORIGIN);
   checkVariable("BASE_PORT", process.env.BASE_PORT);
@@ -80,7 +82,7 @@ export function getCorsOptions() {
     CONFIGURATION_NODE_ENV == "stage"
   ) {
     return {
-      methods: "*",
+      methods: "POST,PATCH",
       origin: ["http://localhost:5173", "http://localhost:4173"],
       credentials: true,
     };

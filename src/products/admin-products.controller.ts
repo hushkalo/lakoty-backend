@@ -15,15 +15,20 @@ import { UpdateProductDto } from "./dto/update-product.dto";
 import { Product as ProductModel } from "@prisma/client";
 import { ResponseDataType } from "../type/response-data.type";
 import { JwtGuard } from "../guards/jwt.guard";
+import { User } from "../decorators/user.decorator";
+import { User as UserModel } from "prisma/prisma-client";
 
 @Controller("admin/products")
 export class AdminProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @UseGuards(JwtGuard)
-  @Post()
-  create(@Body() data: CreateProductDto): Promise<ProductModel> {
-    return this.productsService.create(data);
+  @Post("create")
+  create(
+    @Body() data: CreateProductDto,
+    @User() user: UserModel,
+  ): Promise<ProductModel> {
+    return this.productsService.create({ data, user });
   }
 
   @UseGuards(JwtGuard)
@@ -107,9 +112,15 @@ export class AdminProductsController {
 
   @UseGuards(JwtGuard)
   @Delete(":id")
-  remove(@Param("id") id: string): Promise<ProductModel> {
+  remove(
+    @Param("id") id: string,
+    @User() user: UserModel,
+  ): Promise<ProductModel> {
     return this.productsService.remove({
-      id,
+      where: {
+        id,
+      },
+      user,
     });
   }
 }

@@ -18,11 +18,6 @@ import { ResponseDataType } from "../type/response-data.type";
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  @Post()
-  create(@Body() data: CreateProductDto): Promise<ProductModel> {
-    return this.productsService.create(data);
-  }
-
   @Get()
   findAll(
     @Query("take") take?: number,
@@ -91,7 +86,6 @@ export class ProductsController {
         },
         productSizes: {
           omit: {
-            id: true,
             productId: true,
             createdAt: true,
             updatedAt: true,
@@ -136,25 +130,5 @@ export class ProductsController {
       ...product,
       recommendations,
     };
-  }
-
-  @Patch(":id")
-  update(
-    @Param("id") id: string,
-    @Body() data: UpdateProductDto,
-  ): Promise<ProductModel> {
-    return this.productsService.update({
-      where: {
-        id,
-      },
-      data,
-    });
-  }
-
-  @Delete(":id")
-  remove(@Param("id") id: string): Promise<ProductModel> {
-    return this.productsService.remove({
-      id,
-    });
   }
 }

@@ -1,7 +1,7 @@
 export enum ECodeErrors {
   // File errors
   BIG_SIZE_FILE_CODE = "BIG_SIZE_FILE",
-  BIG_SIZE_FILE_MESSAGE = "File size exceeds the limit of 1MB. Please upload a smaller file.",
+  BIG_SIZE_FILE_MESSAGE = "File size exceeds the limit of 5MB. Please upload a smaller file.",
   NOT_SUPPORTED_FILE_CODE = "NOT_SUPPORTED_FILE",
   NOT_SUPPORTED_FILE_MESSAGE = "File type not supported. Please upload a .jpg, .jpeg, or .png file.",
   REQUIRE_QUERY_PARAM_CODE = "REQUIRE_QUERY_PARAM",
@@ -10,6 +10,22 @@ export enum ECodeErrors {
   NOT_SUPPORTED_TYPE_DIRECTORY_MESSAGE = "Type directory not supported. Please use the type directory: 'category' or 'product'.",
   FILE_NOT_FOUND_CODE = "FILE_NOT_FOUND",
   FILE_NOT_FOUND_MESSAGE = "File not found.",
+  // Category errors
+  CATEGORY_ALREADY_EXISTS_CODE = "CATEGORY_ALREADY_EXISTS",
+  CATEGORY_ALREADY_EXISTS_MESSAGE = "Category already exists.",
+  CATEGORY_DOES_NOT_EXIST_CODE = "CATEGORY_NOT_FOUND",
+  CATEGORY_DOES_NOT_EXIST_MESSAGE = "Category not found",
+  // Product errors
+  PRODUCT_DOES_NOT_EXIST_CODE = "PRODUCT_NOT_FOUND",
+  PRODUCT_DOES_NOT_EXIST_MESSAGE = "Product not found.",
+  PRODUCT_ALIAS_ALREADY_EXISTS_CODE = "PRODUCT_ALIAS_ALREADY_EXISTS",
+  PRODUCT_ALIAS_ALREADY_EXISTS_MESSAGE = "Product alias already exists.",
+  PRODUCT_CREATE_FAILED_CODE = "PRODUCT_CREATE_FAILED",
+  PRODUCT_CREATE_FAILED_MESSAGE = "Failed to create product.",
+  PRODUCT_CREATE_INCORRECT_BODY_CODE = "PRODUCT_CREATE_INCORRECT_BODY",
+  PRODUCT_CREATE_INCORRECT_BODY_MESSAGE = "Incorrect body for creating a product. Please check the body:",
+  PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM_CODE = "PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM",
+  PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM_MESSAGE = "Failed to create a product in CRM.",
   // User errors
   USER_ALREADY_EXISTS_CODE = "USER_ALREADY_EXISTS",
   USER_ALREADY_EXISTS_MESSAGE = "User already exists.",
