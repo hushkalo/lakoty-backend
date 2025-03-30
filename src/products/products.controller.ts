@@ -1,16 +1,5 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ProductsService } from "./products.service";
-import { CreateProductDto } from "./dto/create-product.dto";
-import { UpdateProductDto } from "./dto/update-product.dto";
 import { Product as ProductModel } from "@prisma/client";
 import { ResponseDataType } from "../type/response-data.type";
 
@@ -42,10 +31,14 @@ export class ProductsController {
           alias: categoryAlias,
         },
       },
-      orderBy: {
-        name: orderBy ? orderBy : undefined,
-        topProduct: "desc",
-      },
+      orderBy: [
+        {
+          topProduct: "desc",
+        },
+        {
+          name: orderBy ? orderBy : undefined,
+        },
+      ],
       include: {
         images: {
           select: {

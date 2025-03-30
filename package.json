@@ -1,6 +1,6 @@
 {
   "name": "lakoty-store-backend",
-  "version": "1.9.1",
+  "version": "1.10.1",
   "description": "",
   "author": "",
   "private": true,
@@ -8,15 +8,16 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "dotenv -e .env cross-env NODE_ENV=local nest start",
+    "start": "dotenv -e .env.development cross-env NODE_ENV=local nest start",
     "start:dev": "cross-env NODE_ENV=development nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "prisma-generate:dev": "npx prisma migrate dev --name init",
+    "prisma-generate:dev": "dotenv -e .env.development -- npx prisma migrate dev --name init",
     "prisma-generate:prod": "npx prisma migrate deploy"
   },
   "dependencies": {
+    "@eslint/js": "^9.22.0",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.7",
     "@nestjs/config": "^4.0.0",
@@ -35,6 +36,7 @@
     "cookie-parser": "^1.4.7",
     "cross-env": "^7.0.3",
     "dotenv-cli": "^8.0.0",
+    "globals": "^16.0.0",
     "multer": "^1.4.5-lts.1",
     "nest-winston": "^1.10.2",
     "passport": "^0.7.0",
@@ -43,6 +45,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
+    "typescript-eslint": "^8.26.1",
     "winston": "^3.17.0"
   },
   "devDependencies": {

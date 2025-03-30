@@ -127,7 +127,7 @@ model Order {
   firstName        String
   secondName       String
   patronymic       String
-  phone            String
+  phoneNumber      String
   city             String
   warehouseAddress String
   warehouseNumber  String
@@ -139,21 +139,23 @@ model Order {
   messengerType    String
   cityArea         String
   statusId         Int            @default(1)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   Status           OrderStatus    @relation(fields: [statusId], references: [id])
   OrderProduct     OrderProduct[]
 }
 
 model OrderProduct {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   productId   String
   orderId     String
-  sizeId      String
+  sizeId      String?
   quantity    Int
   price       Int
   discount    Int
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  Product     Product     @relation(fields: [productId], references: [id])
-  ProductSize ProductSize @relation(fields: [sizeId], references: [id])
-  Order       Order       @relation(fields: [orderId], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  Product     Product      @relation(fields: [productId], references: [id])
+  ProductSize ProductSize? @relation(fields: [sizeId], references: [id])
+  Order       Order        @relation(fields: [orderId], references: [id])
 }

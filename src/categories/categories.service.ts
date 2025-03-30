@@ -7,7 +7,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { Category, Prisma, User } from "@prisma/client";
 import { ResponseDataType } from "../type/response-data.type";
-import { ECodeErrors } from "../enums/code-errors.enum";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class CategoriesService {
@@ -84,11 +84,10 @@ export class CategoriesService {
     try {
       return this.prisma.category.update(restParams);
     } catch (e) {
-      this.logger.error(e, e.stack, this.SERVICE);
-      throw new InternalServerErrorException({
-        message: ECodeErrors.INTERNAL_SERVER_ERROR_MESSAGE,
-        error_code: ECodeErrors.INTERNAL_SERVER_ERROR_CODE,
-      });
+      if (e instanceof Error) {
+        this.logger.error(e, e.stack, this.SERVICE);
+      }
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
   }
 

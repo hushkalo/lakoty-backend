@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma, Order } from "@prisma/client";
 import { ResponseDataType } from "../type/response-data.type";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class OrderService {
@@ -27,8 +28,30 @@ export class OrderService {
               quantity: item.quantity,
               price: item.price,
               discount: item.discount,
-              sizeId: item.size.productSizeId,
+              sizeId:
+                item.size.name === "base" ? undefined : item.size.productSizeId,
             })),
+          },
+        },
+      },
+    });
+  }
+  async confirm(params: { id: string }) {
+    const order = await this.findOne({
+      where: { id: params.id },
+      include: {
+        Status: true,
+      },
+    });
+    if (order.statusId !== 1) {
+      throw new BadRequestException(ErrorModel.ORDER_ALREADY_CONFIRMED);
+    }
+    return this.prisma.order.update({
+      where: { id: params.id },
+      data: {
+        Status: {
+          connect: {
+            id: 3,
           },
         },
       },
@@ -55,11 +78,13 @@ export class OrderService {
     };
   }
 
-  findOne(params: {
+  findOne<T extends Prisma.OrderInclude>(params: {
     where: Prisma.OrderWhereUniqueInput;
-    include?: Prisma.OrderInclude;
-    omit?: Prisma.OrderOmit;
-  }) {
-    return this.prisma.order.findUnique(params);
+    include: T;
+  }): Promise<Prisma.OrderGetPayload<{ include: T }> | null> {
+    return this.prisma.order.findUnique({
+      where: params.where,
+      include: params.include,
+    });
   }
 }

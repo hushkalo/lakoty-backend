@@ -6,15 +6,15 @@ import {
 } from "@nestjs/common";
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
-import { ECodeErrors } from "../enums/code-errors.enum";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class ValidationPipe implements PipeTransform<any> {
-  async transform(value: any, { metatype }: ArgumentMetadata) {
+  async transform(value: string, { metatype }: ArgumentMetadata) {
     if (!metatype || !this.toValidate(metatype)) {
       return value;
     }
-    const object = plainToInstance(metatype, value);
+    const object = plainToInstance<object, string>(metatype, value);
     const errors = await validate(object);
     if (errors.length > 0) {
       const errorsReason = errors.map((error) => ({
@@ -22,16 +22,21 @@ export class ValidationPipe implements PipeTransform<any> {
         constraints: error.constraints,
       }));
       throw new BadRequestException({
-        message: ECodeErrors.VALIDATION_FAILED_MESSAGE,
-        error_code: ECodeErrors.VALIDATION_FAILED_CODE,
+        ...ErrorModel.VALIDATION_FAILED,
         errorsReason,
       });
     }
     return value;
   }
 
-  private toValidate(metatype: Function): boolean {
-    const types: Function[] = [String, Boolean, Number, Array, Object];
+  private toValidate(metatype: new (...args: unknown[]) => unknown): boolean {
+    const types: Array<new (...args: unknown[]) => unknown> = [
+      String,
+      Boolean,
+      Number,
+      Array,
+      Object,
+    ];
     return !types.includes(metatype);
   }
 }

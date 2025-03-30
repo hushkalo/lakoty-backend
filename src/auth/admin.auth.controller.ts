@@ -14,7 +14,7 @@ import { JwtGuard } from "../guards/jwt.guard";
 import { ValidationPipe } from "../pipes/validation.pipe";
 import { Cookies } from "../decorators/cookies.decorator";
 import { CookieDto } from "./dto/cookie.dto";
-import { ECodeErrors } from "../enums/code-errors.enum";
+import { ErrorModel } from "../model/error.model";
 
 @Controller("admin/auth")
 export class AdminAuthController {
@@ -62,10 +62,7 @@ export class AdminAuthController {
     if (!accessToken) {
       res.clearCookie("accessToken");
       res.clearCookie("sessionId");
-      return res.status(401).json({
-        message: ECodeErrors.REFRESH_TOKEN_EXPIRED_MESSAGE,
-        error_code: ECodeErrors.REFRESH_TOKEN_EXPIRED_CODE,
-      });
+      return res.status(401).json(ErrorModel.REFRESH_TOKEN_EXPIRED);
     }
     res.cookie("accessToken", accessToken, { httpOnly: true });
     return {

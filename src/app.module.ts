@@ -11,15 +11,9 @@ import { UserModule } from "./user/user.module";
 import { AuthModule } from "./auth/auth.module";
 import { CourseModule } from "./course/course.module";
 import { OrderModule } from "./order/order.module";
-import { AdminOrderController } from "./order/admin.order.controller";
-import { ProductsController } from "./products/products.controller";
-import { StatusController } from "./status/status.controller";
-import { UploadController } from "./upload/upload.controller";
-import { AdminUserController } from "./user/admin.user.controller";
-import { CourseController } from "./course/course.controller";
-import { CategoriesController } from "./categories/categories.controller";
-import { AdminAuthController } from "./auth/admin.auth.controller";
-import { AdminCategoriesController } from "./categories/admin-categories.controller";
+import { validate } from "./config/env.validation";
+import { configuration } from "./config/configuration";
+import { NovaPostModule } from "./nova-post/nova-post.module";
 
 @Module({
   imports: [
@@ -27,7 +21,10 @@ import { AdminCategoriesController } from "./categories/admin-categories.control
     PrismaModule,
     ProductsModule,
     ConfigModule.forRoot({
-      envFilePath: `.env.${process.env.NODE_ENV}`,
+      envFilePath: `.env.${process.env.NODE_ENV ?? "development"}`,
+      load: [configuration],
+      expandVariables: true,
+      validate,
     }),
     UploadModule,
     StatusModule,
@@ -41,6 +38,7 @@ import { AdminCategoriesController } from "./categories/admin-categories.control
       },
     ]),
     OrderModule,
+    NovaPostModule,
   ],
   providers: [
     {

@@ -7,12 +7,13 @@ import {
 import { LoginDto, RegisterDto } from "./dto/create-auth.dto";
 import { UserService } from "../user/user.service";
 import { type User, type UserSession } from "@prisma/client";
-import { ECodeErrors } from "../enums/code-errors.enum";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginResponseDto } from "./dto/responses.dto";
-import { JWT_CONFIG } from "../configuration";
 import { comparePassword } from "../utils/bcrypt.util";
+import { ConfigService } from "@nestjs/config";
+import { EnvironmentVariables } from "../config/env.validation";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class AuthService {
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly logger: Logger,
+    private readonly configService: ConfigService<EnvironmentVariables>,
   ) {}
 
   async signIn(data: LoginDto): Promise<LoginResponseDto> {
@@ -36,7 +38,7 @@ export class AuthService {
       accessToken: await this.jwtService.signAsync(
         { sub: user.id },
         {
-          expiresIn: JWT_CONFIG.accessTokenExpiresIn,
+          expiresIn: this.configService.get("JWT_ACCESS_TOKEN_EXPIRES_IN"),
         },
       ),
       sessionId: session.id,
@@ -51,24 +53,19 @@ export class AuthService {
     });
     if (user) {
       this.logger.error(
-        `${ECodeErrors.USER_ALREADY_EXISTS_MESSAGE} - ${data.email}`,
+        `${ErrorModel.USER_ALREADY_EXISTS.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException({
-        error_code: ECodeErrors.USER_ALREADY_EXISTS_CODE,
-        message: ECodeErrors.USER_ALREADY_EXISTS_MESSAGE,
-      });
+      throw new BadRequestException(ErrorModel.USER_PASSWORD_NOT_MATCH);
     }
     if (data.password !== data.confirmPassword) {
       this.logger.error(
-        `${ECodeErrors.USER_PASSWORD_NOT_MATCH_MESSAGE} - ${data.email}`,
+        `${ErrorModel.USER_PASSWORD_NOT_MATCH.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException({
-        error_code: ECodeErrors.USER_PASSWORD_NOT_MATCH_CODE,
-        message: ECodeErrors.USER_PASSWORD_NOT_MATCH_MESSAGE,
-      });
+      throw new BadRequestException(ErrorModel.USER_PASSWORD_NOT_MATCH);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword, ...rest } = data;
     return this.usersService.create(rest);
   }
@@ -101,13 +98,10 @@ export class AuthService {
     });
     if (!session) {
       this.logger.error(
-        `${ECodeErrors.SESSION_NOT_FOUND_MESSAGE} - ${sessionId}`,
+        `${ErrorModel.SESSION_NOT_FOUND.message} - ${sessionId}`,
         this.SERVICE,
       );
-      throw new BadRequestException({
-        error_code: ECodeErrors.SESSION_NOT_FOUND_CODE,
-        message: ECodeErrors.SESSION_NOT_FOUND_MESSAGE,
-      });
+      throw new BadRequestException(ErrorModel.SESSION_NOT_FOUND);
     }
     try {
       const refreshToken = await this.jwtService.verifyAsync<{ sub: string }>(
@@ -118,20 +112,22 @@ export class AuthService {
         accessToken: await this.jwtService.signAsync(
           { sub: user.id },
           {
-            expiresIn: JWT_CONFIG.accessTokenExpiresIn,
+            expiresIn: this.configService.get("JWT_ACCESS_TOKEN_EXPIRES_IN"),
           },
         ),
       };
     } catch (error) {
-      if (error.name === "TokenExpiredError") {
-        this.logger.error(
-          `${ECodeErrors.REFRESH_TOKEN_EXPIRED_MESSAGE} - ${sessionId}`,
-          this.SERVICE,
-        );
-        await this.clearSession(sessionId);
-        return {
-          accessToken: null,
-        };
+      if (error instanceof Error) {
+        if (error.name === "TokenExpiredError") {
+          this.logger.error(
+            `${ErrorModel.REFRESH_TOKEN_EXPIRED.message} - ${sessionId}`,
+            this.SERVICE,
+          );
+          await this.clearSession(sessionId);
+          return {
+            accessToken: null,
+          };
+        }
       }
 
       this.logger.error("Error while refreshing tokens", this.SERVICE, error);
@@ -147,13 +143,10 @@ export class AuthService {
     });
     if (!user) {
       this.logger.error(
-        `${ECodeErrors.USER_DOES_NOT_EXIST_MESSAGE} - ${data.email}`,
+        `${ErrorModel.USER_DOES_NOT_EXIST.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException({
-        error_code: ECodeErrors.USER_DOES_NOT_EXIST_CODE,
-        message: ECodeErrors.USER_DOES_NOT_EXIST_MESSAGE,
-      });
+      throw new BadRequestException(ErrorModel.USER_DOES_NOT_EXIST);
     }
     const isPasswordMatch = await comparePassword({
       password: data.password,
@@ -161,15 +154,12 @@ export class AuthService {
     });
     if (!isPasswordMatch) {
       this.logger.error(
-        `${ECodeErrors.USER_PASSWORD_NOT_MATCH_MESSAGE} - ${data.email}`,
+        `${ErrorModel.USER_PASSWORD_NOT_MATCH.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException({
-        // make loggers
-        error_code: ECodeErrors.USER_INVALID_CREDENTIALS_CODE,
-        message: ECodeErrors.USER_INVALID_CREDENTIALS_MESSAGE,
-      });
+      throw new BadRequestException(ErrorModel.USER_INVALID_CREDENTIALS);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...result } = user;
     return result;
   }
@@ -182,7 +172,7 @@ export class AuthService {
         refreshToken: await this.jwtService.signAsync(
           { sub: user.id },
           {
-            expiresIn: JWT_CONFIG.refreshTokenExpiresIn,
+            expiresIn: this.configService.get("JWT_REFRESH_TOKEN_EXPIRES_IN"),
           },
         ),
         userId: user.id,

@@ -10,13 +10,13 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateProductDto } from "./dto/create-product.dto";
 import { type ResponseDataType } from "../type/response-data.type";
 import { CategoriesService } from "../categories/categories.service";
-import { ECodeErrors } from "../enums/code-errors.enum";
 import { HttpService } from "@nestjs/axios";
 import { CreateProductCrmDto } from "./dto/create-product-crm.dto";
 import { CrmProductDto } from "./dto/crm-product.dto";
 import { CreateProductOffersCrmDto } from "./dto/create-product-offers-crm.dto";
 import { CrmProductOffersDto } from "./dto/crm-product-offers.dto";
 import { PrismaClientValidationError } from "@prisma/client/runtime/library";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class ProductsService {
@@ -36,10 +36,7 @@ export class ProductsService {
       params.data;
     const isCategoryExist = await this.category.isExist({ id: categoryId });
     if (!isCategoryExist) {
-      throw new NotFoundException({
-        message: ECodeErrors.CATEGORY_DOES_NOT_EXIST_MESSAGE,
-        error_code: ECodeErrors.CATEGORY_DOES_NOT_EXIST_CODE,
-      });
+      throw new NotFoundException(ErrorModel.CATEGORY_DOES_NOT_EXIST);
     }
     const isExistAlias = await this.prisma.product.findFirst({
       where: {
@@ -47,10 +44,7 @@ export class ProductsService {
       },
     });
     if (isExistAlias) {
-      throw new BadRequestException({
-        message: ECodeErrors.PRODUCT_ALIAS_ALREADY_EXISTS_MESSAGE,
-        error_code: ECodeErrors.PRODUCT_ALIAS_ALREADY_EXISTS_CODE,
-      });
+      throw new BadRequestException(ErrorModel.PRODUCT_ALIAS_ALREADY_EXISTS);
     }
     try {
       const product = await this.prisma.product.create({
@@ -106,19 +100,17 @@ export class ProductsService {
         const match = error.message.match(/Unknown argument `([^`]+)`/);
         const result = match ? match[1] : null;
         this.logger.error(error.name, error.stack, this.SERVICE_NAME);
-        throw new BadRequestException({
-          error_code: ECodeErrors.PRODUCT_CREATE_INCORRECT_BODY_CODE,
-          message: `${ECodeErrors.PRODUCT_CREATE_INCORRECT_BODY_MESSAGE} \`${result}\``,
-        });
+        throw new BadRequestException(
+          ErrorModel.PRODUCT_CREATE_INCORRECT_BODY(result),
+        );
       }
-      if (error instanceof BadRequestException) {
-        throw error;
+      if (error instanceof Error) {
+        this.logger.error(error.name, error, this.SERVICE_NAME);
+        throw new BadRequestException(ErrorModel.PRODUCT_CREATE_FAILED);
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       this.logger.error(error.name, error, this.SERVICE_NAME);
-      throw new BadRequestException({
-        error_code: ECodeErrors.PRODUCT_CREATE_FAILED_CODE,
-        message: ECodeErrors.PRODUCT_CREATE_FAILED_MESSAGE,
-      });
+      throw error;
     }
   }
 
@@ -163,6 +155,12 @@ export class ProductsService {
         `Created product in CRM with ID ${crmProduct.data.id} by user email: ${params.user.email}`,
         this.SERVICE_NAME,
       );
+      if (params.product.productSizes.length === 0) {
+        return {
+          crmProduct: crmProduct.data,
+          crmProductOffers: [],
+        };
+      }
       const firstImageUrl =
         params.product.images.length > 0 ? params.product.images[0].url : ""; // TODO: fix that
       const bodyProductOffers: CreateProductOffersCrmDto = {
@@ -205,11 +203,11 @@ export class ProductsService {
         },
         user: params.user,
       });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       this.logger.error(error.message, error, this.SERVICE_NAME);
-      throw new BadRequestException({
-        error_code: ECodeErrors.PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM_CODE,
-        message: ECodeErrors.PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM_MESSAGE,
-      });
+      throw new BadRequestException(
+        ErrorModel.PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM,
+      );
     }
   }
 
@@ -217,16 +215,17 @@ export class ProductsService {
     skip?: number;
     take?: number;
     where?: Prisma.ProductWhereInput;
-    orderBy?: Prisma.ProductOrderByWithRelationInput;
+    orderBy?: Prisma.ProductOrderByWithRelationInput[];
     include?: Prisma.ProductInclude;
     omit?: Prisma.ProductOmit;
   }): Promise<ResponseDataType<Product[]>> {
-    const { omit, include, take, skip, ...restParams } = params;
+    const { omit, include, take, skip, orderBy, ...restParams } = params;
     const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         ...params,
         take,
         skip,
+        orderBy,
         include,
         omit,
       }),

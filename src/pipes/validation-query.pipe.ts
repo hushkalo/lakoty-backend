@@ -1,19 +1,11 @@
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from "@nestjs/common";
-import { ECodeErrors } from "../enums/code-errors.enum";
+import { BadRequestException, Injectable, PipeTransform } from "@nestjs/common";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class ValidationQueryPipe implements PipeTransform {
-  transform(value: string | undefined, metadata: ArgumentMetadata) {
+  transform(value: string | undefined) {
     if (!value) {
-      throw new BadRequestException({
-        error_code: ECodeErrors.REQUIRE_QUERY_PARAM_CODE,
-        message: `${ECodeErrors.REQUIRE_QUERY_PARAM_MESSAGE} ${metadata.data}`,
-      });
+      throw new BadRequestException(ErrorModel.REQUIRE_QUERY_PARAM);
     }
     return value;
   }

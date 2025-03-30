@@ -54,10 +54,14 @@ export class AdminProductsController {
           alias: categoryAlias || undefined,
         },
       },
-      orderBy: {
-        name: orderBy ? orderBy : undefined,
-        topProduct: "desc",
-      },
+      orderBy: [
+        {
+          topProduct: "desc",
+        },
+        {
+          createdAt: orderBy ? orderBy : undefined,
+        },
+      ],
       include: {
         images: true,
         productSizes: true,

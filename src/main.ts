@@ -5,12 +5,8 @@ import { json } from "express";
 import * as cookieParser from "cookie-parser";
 import { WinstonModule } from "nest-winston";
 import { instance } from "./logger/winston.logger";
-import {
-  BASE_PORT,
-  CONFIGURATION_NODE_ENV,
-  getCorsOptions,
-  validateConfiguration,
-} from "./configuration";
+import { ConfigService } from "@nestjs/config";
+import { EnvironmentVariables } from "./config/env.validation";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -19,12 +15,17 @@ async function bootstrap() {
     }),
   });
 
-  const PORT = BASE_PORT;
+  const configService = app.get(ConfigService<EnvironmentVariables>);
+
   if (
-    CONFIGURATION_NODE_ENV === "development" ||
-    CONFIGURATION_NODE_ENV === "stage"
+    configService.get("NODE_ENV") === "development" ||
+    configService.get("NODE_ENV") === "stage"
   ) {
-    app.enableCors(getCorsOptions());
+    app.enableCors({
+      methods: "POST,PATCH",
+      origin: ["http://localhost:5173", "http://localhost:4173"],
+      credentials: true,
+    });
     const config = new DocumentBuilder()
       .setTitle("Lakoty Store API")
       .setDescription("The Lakoty Store API description")
@@ -34,14 +35,19 @@ async function bootstrap() {
     SwaggerModule.setup("api", app, document);
   }
 
-  if (CONFIGURATION_NODE_ENV === "production") {
-    app.enableCors(getCorsOptions());
+  if (configService.get("NODE_ENV") === "production") {
+    app.enableCors({
+      methods: "POST",
+      origin: [configService.get("CORS_ORIGIN")],
+      credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    });
   }
 
-  app.use(json({ limit: process.env.BODY_LIMIT || "1mb" }));
+  app.use(json({ limit: configService.get("BODY_LIMIT") || "1mb" }));
   app.use(cookieParser());
-  await app.listen(PORT);
-  validateConfiguration();
+  await app.listen(configService.get("BASE_PORT"));
   instance.log({
     message: `Application is running on: ${await app.getUrl()} time: ${new Date(
       new Date().toLocaleString("ua-Ua", {
@@ -52,7 +58,7 @@ async function bootstrap() {
   });
 }
 
-bootstrap().catch((error) => {
+bootstrap().catch((error: Error) => {
   instance.log({
     message: `Error during application bootstrap: ${error.message}`,
     level: "error",

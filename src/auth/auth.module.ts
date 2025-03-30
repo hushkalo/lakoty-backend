@@ -4,9 +4,10 @@ import { AdminAuthController } from "./admin.auth.controller";
 import { UserModule } from "../user/user.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { JwtModule } from "@nestjs/jwt";
-import { JWT_CONFIG } from "../configuration";
 import { JwtStrategy } from "./jwt.strategy";
 import { PassportModule } from "@nestjs/passport";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { EnvironmentVariables } from "../config/env.validation";
 
 @Module({
   controllers: [AdminAuthController],
@@ -15,10 +16,17 @@ import { PassportModule } from "@nestjs/passport";
     PrismaModule,
     UserModule,
     PassportModule.register({ defaultStrategy: "jwt", session: false }),
-    JwtModule.register({
-      global: true,
-      secret: JWT_CONFIG.secret,
-      signOptions: { expiresIn: JWT_CONFIG.accessTokenExpiresIn },
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<EnvironmentVariables>) => ({
+        global: true,
+        secret: configService.get("JWT_SECRET"),
+        signOptions: {
+          expiresIn: configService.get("JWT_ACCESS_TOKEN_EXPIRES_IN"),
+        },
+      }),
     }),
   ],
   exports: [AuthService],

@@ -4,7 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { hashPassword } from "../utils/bcrypt.util";
-import { ECodeErrors } from "../enums/code-errors.enum";
+import { ErrorModel } from "../model/error.model";
 
 @Injectable()
 export class UserService {
@@ -19,7 +19,7 @@ export class UserService {
         password: hashedPassword,
         role: {
           connect: {
-            id: data.roleId,
+            id: roleId,
           },
         },
       },
@@ -70,10 +70,7 @@ export class UserService {
   }) {
     const { password, confirmPassword, ...rest } = params.data;
     if (password && confirmPassword === password) {
-      throw new BadRequestException({
-        error_code: ECodeErrors.USER_PASSWORD_NOT_MATCH_CODE,
-        message: ECodeErrors.USER_PASSWORD_NOT_MATCH_MESSAGE,
-      });
+      throw new BadRequestException(ErrorModel.USER_PASSWORD_NOT_MATCH);
     }
     const passwordHash = password ? await hashPassword(password) : undefined;
     return this.prisma.user.update({
