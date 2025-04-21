@@ -1,0 +1,19 @@
+{
+  "name": "error-model",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/error-model/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/shared/error-model",
+        "main": "libs/shared/error-model/src/index.ts",
+        "tsConfig": "libs/shared/error-model/tsconfig.lib.json",
+        "assets": ["libs/shared/error-model/*.md"]
+      }
+    }
+  },
+  "tags": []
+}

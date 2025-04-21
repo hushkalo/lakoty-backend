@@ -1,0 +1,29 @@
+{
+  "name": "prisma-schema",
+  "targets": {
+    "generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prisma generate --schema=libs/prisma-schema/prisma/schema.prisma"
+      }
+    },
+    "migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prisma migrate dev --schema=libs/prisma-schema/prisma/schema.prisma"
+      }
+    },
+    "seed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node libs/prisma-schema/prisma/seed.ts"
+      }
+    },
+    "studio": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prisma studio --schema=libs/prisma-schema/prisma/schema.prisma"
+      }
+    }
+  }
+}
