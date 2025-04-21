@@ -20,9 +20,9 @@ import { ErrorModel } from "@shared/error-model";
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post("sing-in")
+  @Post("sign-in")
   @UsePipes(ValidationPipe)
-  async singIn(
+  async signIn(
     @Body() data: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -31,7 +31,7 @@ export class AuthController {
     res.cookie("sessionId", sessionId, { httpOnly: true });
 
     return {
-      message: "Sing in success",
+      message: "Sign in success",
     };
   }
 
