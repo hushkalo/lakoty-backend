@@ -1,15 +1,33 @@
+export class DefaultResponseDto<T> {
+  data: T;
+}
+
+export class GetFindCityResponse {
+  id: string;
+  name: string;
+  region: string;
+}
+
+export class GetFindWarehouseResponse {
+  id: string;
+  name: string;
+  address: string;
+  categoryOfWarehouse: "Branch" | "Postomat";
+  numberWarehouse: string;
+}
+
 export class NovaPostResponseDto<T> {
   success: boolean;
   data: T[];
-  errors: any[];
-  warnings: any[];
+  errors: unknown[];
+  warnings: unknown[];
   info: {
     totalCount: number;
   };
-  messageCodes: any[];
-  errorCodes: any[];
-  warningCodes: any[];
-  infoCodes: any[];
+  messageCodes: unknown[];
+  errorCodes: unknown[];
+  warningCodes: unknown[];
+  infoCodes: unknown[];
 }
 
 export class NovaPostCityDto {
@@ -123,4 +141,16 @@ export class NovaPostWarehouseDto {
   BeaconCode: string;
   Location: string;
   PostomatFor: string;
+}
+
+export type TCalledMethod = "getCities" | "getWarehouses";
+type TModelName = "AddressGeneral";
+
+export class DefaultBodyNovaPostDto<T extends TCalledMethod> {
+  apiKey: string;
+  modelName: TModelName;
+  calledMethod: TCalledMethod;
+  methodProperties: T extends "getCities"
+    ? { Limit: string; Page: string; FindByString: string }
+    : { FindByString: string; CityRef: string; Limit: string; Page: string };
 }

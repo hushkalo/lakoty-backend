@@ -4,7 +4,7 @@ import {
   DefaultResponseDto,
   GetFindCityResponse,
   GetFindWarehouseResponse,
-} from "./dto/service-responses.dto";
+} from "@shared/types";
 
 @Controller("nova-post")
 export class NovaPostController {
