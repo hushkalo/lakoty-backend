@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  output        = "../../prisma-client/src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id               String     @id @default(cuid())
+  name             String
+  description      String?
+  keyCrmId         Int?
+  alias            String     @unique
+  subCategories    Category[] @relation("SubCategories")
+  parentCategory   Category?  @relation("SubCategories", fields: [parentCategoryId], references: [id])
+  parentCategoryId String?
+  imageUrl         String?
+  hidden           Boolean    @default(false)
+  products         Product[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Product {
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  discount     Float
+  topProduct   Boolean        @default(false)
+  alias        String         @unique
+  sku          String?
+  category     Category       @relation(fields: [categoryId], references: [id])
+  quantity     Int            @default(0)
+  keyCrmId     Int?
+  hidden       Boolean        @default(false)
+  categoryId   String
+  images       ProductImage[]
+  productSizes ProductSize[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  OrderProduct OrderProduct[]
+}
+
+model ProductSize {
+  id          String   @id @default(cuid())
+  name        String
+  sku         String?
+  quantity    Int      @default(0)
+  isAvailable Boolean  @default(true)
+  keyCrmId    Int?
+  productId   String
+  Product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  OrderProduct OrderProduct[]
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  order     Int
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ServerStatus {
+  id        String   @id @default(cuid())
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  password     String
+  firstName    String?
+  lastName     String?
+  phoneNumber  String?
+  imageUrl     String?
+  role         Role          @relation(fields: [roleId], references: [id])
+  roleId       String
+  userSessions UserSession[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  refreshToken String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  User         User     @relation(fields: [userId], references: [id])
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User[]
+}
+
+model OrderStatus {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Order     Order[]
+}
+
+model Order {
+  id               String         @id @default(cuid())
+  firstName        String
+  secondName       String
+  patronymic       String
+  phoneNumber      String
+  city             String
+  warehouseAddress String
+  warehouseNumber  String
+  warehouseType    String
+  messenger        String
+  cityRef          String
+  warehouseRef     String
+  paymentType      String
+  messengerType    String
+  cityArea         String
+  statusId         Int            @default(1)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  Status           OrderStatus    @relation(fields: [statusId], references: [id])
+  OrderProduct     OrderProduct[]
+}
+
+model OrderProduct {
+  id          String       @id @default(cuid())
+  productId   String
+  orderId     String
+  sizeId      String?
+  quantity    Int
+  price       Int
+  discount    Int
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  Product     Product      @relation(fields: [productId], references: [id])
+  ProductSize ProductSize? @relation(fields: [sizeId], references: [id])
+  Order       Order        @relation(fields: [orderId], references: [id])
+}
