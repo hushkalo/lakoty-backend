@@ -8,10 +8,12 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "webpack-cli build",
-        "args": ["node-env=production"]
+        "command": "webpack-cli build"
       },
       "configurations": {
+        "production": {
+          "args": ["node-env=production"]
+        },
         "development": {
           "args": ["node-env=development"]
         }

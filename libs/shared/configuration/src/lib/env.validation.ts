@@ -106,6 +106,7 @@ export function validate(config: Record<string, unknown>) {
     logger.debug("NODE_ENV: " + validatedConfig.NODE_ENV);
     logger.debug("BASE_PORT: " + validatedConfig.BASE_URL);
     logger.debug("DATABASE_URL: " + validatedConfig.DATABASE_URL);
+    logger.debug("CRM_API_URL: " + validatedConfig.CORS_ORIGIN);
     return validatedConfig;
   }
   const validatedConfig = plainToInstance(
@@ -126,5 +127,6 @@ export function validate(config: Record<string, unknown>) {
   logger.debug("NODE_ENV: " + validatedConfig.NODE_ENV);
   logger.debug("BASE_PORT: " + validatedConfig.BASE_URL);
   logger.debug("DATABASE_URL: " + validatedConfig.DATABASE_URL);
+  logger.debug("CORS_ORIGIN: " + validatedConfig.CORS_ORIGIN);
   return validatedConfig;
 }

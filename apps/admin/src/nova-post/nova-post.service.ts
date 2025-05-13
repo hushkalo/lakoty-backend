@@ -7,9 +7,10 @@ import {
   NovaPostCityDto,
   NovaPostResponseDto,
   NovaPostWarehouseDto,
-  DefaultResponseDto,
   GetFindCityResponse,
   GetFindWarehouseResponse,
+  FindCityResponseDto,
+  FindWarehouseResponseDto,
 } from "@shared/types";
 
 @Injectable()
@@ -21,7 +22,7 @@ export class NovaPostService {
 
   async getCities(params: {
     searchCityName: string;
-  }): Promise<DefaultResponseDto<GetFindCityResponse[]>> {
+  }): Promise<FindCityResponseDto> {
     const body: DefaultBodyNovaPostDto<"getCities"> = {
       apiKey: process.env.NOVA_POST_API_KEY,
       modelName: "AddressGeneral",
@@ -49,7 +50,7 @@ export class NovaPostService {
   async getWarehouses(params: {
     searchWarehouseName: string;
     cityRef: string;
-  }): Promise<DefaultResponseDto<GetFindWarehouseResponse[]>> {
+  }): Promise<FindWarehouseResponseDto> {
     const body: DefaultBodyNovaPostDto<"getWarehouses"> = {
       apiKey: process.env.NOVA_POST_API_KEY,
       modelName: "AddressGeneral",

@@ -1,17 +1,79 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { CreateOrderDto } from "./dto/create-order.dto";
-import { Prisma, Order, PrismaService } from "@libs/prisma-client";
-import { ResponseDataType } from "@shared/types";
-import { ErrorModel } from "@shared/error-model";
+import { PrismaService } from "@libs/prisma-client";
+import {
+  ProductDoesNotExistError,
+  ProductSizeDoesNotExistError,
+} from "@shared/error-model";
+import { ProductsService } from "../products/products.service";
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly productsService: ProductsService,
+  ) {}
 
-  create(params: { data: Prisma.OrderCreateInput & CreateOrderDto }) {
-    const {
-      data: { products, ...rest },
-    } = params;
+  async create(params: { data: CreateOrderDto }) {
+    const { orderProducts, ...rest } = params.data;
+    const { productIds, productSizeIds } = orderProducts.reduce(
+      (
+        acc: {
+          productIds: string[];
+          productSizeIds: string[];
+        },
+        item,
+      ) => {
+        const productId = item.productId;
+        const productSizeId = item.size.productSizeId;
+
+        return {
+          productIds: [...acc.productIds, productId],
+          productSizeIds: [...acc.productSizeIds, productSizeId],
+        };
+      },
+      {
+        productIds: [],
+        productSizeIds: [],
+      },
+    );
+    const findAllProduct = await this.productsService.findAll({
+      where: {
+        id: {
+          in: productIds,
+        },
+      },
+    });
+    if (findAllProduct.total !== productIds.length) {
+      const notFoundProduct = productIds.filter(
+        (item) => !findAllProduct.data.some((product) => product.id === item),
+      );
+      throw new BadRequestException(
+        new ProductDoesNotExistError(notFoundProduct.join(", ")),
+      );
+    }
+    const findAllProductSize = await this.productsService.findAll({
+      where: {
+        productSizes: {
+          some: {
+            id: {
+              in: productSizeIds,
+            },
+          },
+        },
+      },
+    });
+    if (findAllProductSize.total !== productSizeIds.length) {
+      const notFoundProductSize = productSizeIds.filter(
+        (item) =>
+          !findAllProductSize.data.some((product) =>
+            product.productSizes.some((size) => size.id === item),
+          ),
+      );
+      throw new BadRequestException(
+        new ProductSizeDoesNotExistError(notFoundProductSize.join(", ")),
+      );
+    }
     return this.prisma.order.create({
       data: {
         ...rest,
@@ -22,7 +84,7 @@ export class OrderService {
         },
         OrderProduct: {
           createMany: {
-            data: products.map((item) => ({
+            data: orderProducts.map((item) => ({
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
@@ -33,57 +95,6 @@ export class OrderService {
           },
         },
       },
-    });
-  }
-  async confirm(params: { id: string }) {
-    const order = await this.findOne({
-      where: { id: params.id },
-      include: {
-        Status: true,
-      },
-    });
-    if (order.statusId !== 1) {
-      throw new BadRequestException(ErrorModel.ORDER_ALREADY_CONFIRMED);
-    }
-    return this.prisma.order.update({
-      where: { id: params.id },
-      data: {
-        Status: {
-          connect: {
-            id: 3,
-          },
-        },
-      },
-    });
-  }
-
-  async findAll(params?: {
-    skip?: number;
-    take?: number;
-    where?: Prisma.OrderWhereInput;
-    orderBy?: Prisma.OrderOrderByWithRelationInput;
-    omit?: Prisma.OrderOmit;
-    include?: Prisma.OrderInclude;
-  }): Promise<ResponseDataType<Order[]>> {
-    const { omit, include, ...restParams } = params;
-    const [orders, count] = await this.prisma.$transaction([
-      this.prisma.order.findMany({ ...restParams, include, omit }),
-      this.prisma.order.count(restParams),
-    ]);
-    return {
-      data: orders,
-      total: count,
-      to: orders.length,
-    };
-  }
-
-  findOne<T extends Prisma.OrderInclude>(params: {
-    where: Prisma.OrderWhereUniqueInput;
-    include: T;
-  }): Promise<Prisma.OrderGetPayload<{ include: T }> | null> {
-    return this.prisma.order.findUnique({
-      where: params.where,
-      include: params.include,
     });
   }
 }

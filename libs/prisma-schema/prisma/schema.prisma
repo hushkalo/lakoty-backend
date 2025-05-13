@@ -26,6 +26,9 @@ model Category {
   parentCategoryId String?
   imageUrl         String?
   hidden           Boolean    @default(false)
+  depth            Int        @default(0)
+  top              Boolean    @default(false)
+  pathname         String[]
   products         Product[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -44,6 +47,7 @@ model Product {
   quantity     Int            @default(0)
   keyCrmId     Int?
   hidden       Boolean        @default(false)
+  salesCount   Int            @default(0)
   categoryId   String
   images       ProductImage[]
   productSizes ProductSize[]

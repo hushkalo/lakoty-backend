@@ -2,17 +2,17 @@ import { Injectable } from "@nestjs/common";
 import { HttpService } from "@nestjs/axios";
 import { ConfigService } from "@nestjs/config";
 import { EnvironmentVariablesForStore } from "@shared/configuration";
-import { DefaultBodyNovaPostDto } from "@shared/types";
+import {
+  DefaultBodyNovaPostDto,
+  FindCityResponseDto,
+  FindWarehouseResponseDto,
+} from "@shared/types";
 import {
   NovaPostCityDto,
   NovaPostResponseDto,
   NovaPostWarehouseDto,
 } from "@shared/types";
-import {
-  DefaultResponseDto,
-  GetFindCityResponse,
-  GetFindWarehouseResponse,
-} from "@shared/types";
+import { GetFindCityResponse, GetFindWarehouseResponse } from "@shared/types";
 
 @Injectable()
 export class NovaPostService {
@@ -23,7 +23,7 @@ export class NovaPostService {
 
   async getCities(params: {
     searchCityName: string;
-  }): Promise<DefaultResponseDto<GetFindCityResponse[]>> {
+  }): Promise<FindCityResponseDto> {
     const body: DefaultBodyNovaPostDto<"getCities"> = {
       apiKey: this.configService.get("NOVA_POST_API_KEY"),
       modelName: "AddressGeneral",
@@ -51,7 +51,7 @@ export class NovaPostService {
   async getWarehouses(params: {
     searchWarehouseName: string;
     cityRef: string;
-  }): Promise<DefaultResponseDto<GetFindWarehouseResponse[]>> {
+  }): Promise<FindWarehouseResponseDto> {
     const body: DefaultBodyNovaPostDto<"getWarehouses"> = {
       apiKey: process.env.NOVA_POST_API_KEY,
       modelName: "AddressGeneral",

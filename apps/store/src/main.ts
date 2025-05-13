@@ -16,7 +16,9 @@ async function bootstrap() {
   });
 
   const configService = app.get(ConfigService<EnvironmentVariablesForStore>);
-
+  app.use(json({ limit: configService.get("BODY_LIMIT") || "1mb" }));
+  app.use(cookieParser());
+  app.setGlobalPrefix("api");
   if (
     configService.get("NODE_ENV") === "development" ||
     configService.get("NODE_ENV") === "stage"
@@ -30,24 +32,21 @@ async function bootstrap() {
       .setTitle("Lakoty Store API")
       .setDescription("The Lakoty Store API description")
       .setVersion("0.1")
+      .addServer("http://localhost:8080")
       .build();
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup("api", app, document);
-  }
-
-  if (configService.get("NODE_ENV") === "production") {
-    app.enableCors({
-      methods: "POST",
-      origin: [configService.get("CORS_ORIGIN")],
-      credentials: true,
-      preflightContinue: false,
-      optionsSuccessStatus: 204,
+    SwaggerModule.setup("api/swagger", app, document, {
+      jsonDocumentUrl: "api/swagger/json",
     });
   }
 
-  app.use(json({ limit: configService.get("BODY_LIMIT") || "1mb" }));
-  app.use(cookieParser());
-  app.setGlobalPrefix("api");
+  app.enableCors({
+    methods: ["GET", "POST"],
+    origin: [configService.get("CORS_ORIGIN")],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
   await app.listen(configService.get("BASE_PORT"));
   instance.log({
     message: `Application is running on: ${await app.getUrl()} time: ${new Date(

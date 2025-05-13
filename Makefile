@@ -1,54 +1,56 @@
 build:
-	@echo "Building project..."
-	@npm run build
+	@echo "Building store project..."
+	@npm run build:all
+	@echo "Building store project done"
+
+move-prisma-client:
+	@echo "Moving prisma client..."
+	@cp -R libs/prisma-client/src/generated dist/libs/prisma-client/src/generated
+	@echo "Moving prisma client done"
 
 format:
 	@echo "Formatting code..."
 	@npm run format
 
-start:
-	@echo "Starting server..."
-	@npm run start
-
-start-dev:
+start-dev-admin:
 	@echo "Starting server in development mode..."
-	@npm run start:dev
+	@npm run start:dev:admin
 
-start-debug:
-	@echo "Starting server in debug mode..."
-	@npm run start:debug
+start-prod-admin:
+	@echo "Starting server in development mode..."
+	@npm run start:prod:admin
 
-start-prod:
+start-dev-store:
+	@echo "Starting server in development mode..."
+	@npm run start:dev:store
+
+start-prod-store:
 	@echo "Starting server in production mode..."
-	@npm run start:prod
+	@npm run start:prod:store
+
+build-admin:
+	@echo "Building admin project..."
+	@npm run build:admin
+
+build-store:
+	@echo "Building store project..."
+	@npm run build:store
 
 lint:
 	@echo "Linting code..."
 	@npm run lint
 
-migrate-dev:
+prisma-migrate:
 	@echo "Migrating database..."
-	@npm run prisma-generate:dev
+	@npm run prisma:migrate
 
-migrate-prod:
-	@echo "Migrating database..."
-	@npm run prisma-generate:prod
-
-migrate-seed:
+prisma-seed:
 	@echo "Seeding data..."
-	@npx prisma db seed
+	@npm run prisma:seed
 
-create-docker-container:
-	@echo "Creating backend container..."
-	@docker-compose up --build -d
-generate-prisma:
+prisma-generate:
 	@echo "Generating prisma client..."
-	@npx prisma generate
-create-docker-db:
-	@echo "Creating database container..."
-	@docker-compose -f docker-compose.db.yml up -d
-create-docker-app:
-	@echo "Creating redis container..."
-	@docker-compose -f docker-compose.app.yml up -d
+	@npm run prisma:generate
+	@echo "Generating prisma client done"
 
-.PHONY: build format start start-dev start-debug start-prod lint migrate-dev migrate-prod migrate-seed create-docker-container generate-prisma create-docker-db create-docker-app
+.PHONY: build format start-dev-admin start-prod-admin start-dev-store start-prod-store lint prisma-generate prisma-migrate prisma-seed

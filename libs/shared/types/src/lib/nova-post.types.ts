@@ -1,19 +1,69 @@
-export class DefaultResponseDto<T> {
-  data: T;
-}
+import { ApiProperty } from "@nestjs/swagger";
 
 export class GetFindCityResponse {
+  @ApiProperty({
+    description: "Unique identifier of the city",
+    example: "8d5a980d-391c-11dd-90d9-001a92567626",
+  })
   id: string;
+
+  @ApiProperty({
+    description: "Name of the city",
+    example: "Київ",
+  })
   name: string;
+
+  @ApiProperty({
+    description: "Region/oblast where the city is located",
+    example: "Київська область",
+  })
   region: string;
 }
 
 export class GetFindWarehouseResponse {
+  @ApiProperty({
+    description: "Unique identifier of the warehouse",
+    example: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
+  })
   id: string;
+
+  @ApiProperty({
+    description: "Name of the warehouse",
+    example: "Відділення №1",
+  })
   name: string;
+
+  @ApiProperty({
+    description: "Physical address of the warehouse",
+    example: "вул. Хрещатик, 22",
+  })
   address: string;
-  categoryOfWarehouse: "Branch" | "Postomat";
+
+  @ApiProperty({
+    description: "Category of the warehouse",
+    enum: ["Branch", "Postomat", "Store"],
+    example: "Branch",
+  })
+  categoryOfWarehouse: "Branch" | "Postomat" | "Store";
+
+  @ApiProperty({
+    description: "Warehouse number",
+    example: "1",
+  })
   numberWarehouse: string;
+}
+
+export class FindCityResponseDto {
+  @ApiProperty({ type: [GetFindCityResponse], description: "List of cities" })
+  data: GetFindCityResponse[];
+}
+
+export class FindWarehouseResponseDto {
+  @ApiProperty({
+    type: [GetFindWarehouseResponse],
+    description: "List of warehouses",
+  })
+  data: GetFindWarehouseResponse[];
 }
 
 export class NovaPostResponseDto<T> {
@@ -123,7 +173,7 @@ export class NovaPostWarehouseDto {
   WarehouseStatus: string;
   WarehouseStatusDate: string;
   WarehouseIllusha: string;
-  CategoryOfWarehouse: "Branch" | "Postomat";
+  CategoryOfWarehouse: "Branch" | "Postomat" | "Store";
   Direct: string;
   RegionCity: string;
   WarehouseForAgent: string;

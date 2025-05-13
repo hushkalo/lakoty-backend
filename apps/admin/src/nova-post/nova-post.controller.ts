@@ -1,10 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { NovaPostService } from "./nova-post.service";
-import {
-  DefaultResponseDto,
-  GetFindCityResponse,
-  GetFindWarehouseResponse,
-} from "@shared/types";
+import { FindCityResponseDto, FindWarehouseResponseDto } from "@shared/types";
 
 @Controller("nova-post")
 export class NovaPostController {
@@ -13,7 +9,7 @@ export class NovaPostController {
   @Get("find/cities")
   getCities(
     @Query("searchCityName") searchCityName: string,
-  ): Promise<DefaultResponseDto<GetFindCityResponse[]>> {
+  ): Promise<FindCityResponseDto> {
     return this.novaPostService.getCities({
       searchCityName,
     });
@@ -22,7 +18,7 @@ export class NovaPostController {
   getWarehouses(
     @Query("searchWarehouseName") searchWarehouseName: string,
     @Query("cityRef") cityRef: string,
-  ): Promise<DefaultResponseDto<GetFindWarehouseResponse[]>> {
+  ): Promise<FindWarehouseResponseDto> {
     return this.novaPostService.getWarehouses({
       searchWarehouseName,
       cityRef,
