@@ -62,7 +62,7 @@ export class ProductDto {
     description: "Indicates if the product is featured as top product",
     example: true,
   })
-  topProduct: boolean;
+  top: boolean;
 
   @ApiProperty({
     description: "URL-friendly version of product name",

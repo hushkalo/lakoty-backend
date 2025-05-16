@@ -1,12 +1,14 @@
 import {
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { Category, Prisma, User, PrismaService } from "@libs/prisma-client";
-import { ResponseDataType } from "@shared/types";
+import { Prisma, User, PrismaService } from "@libs/prisma-client";
 import { ErrorModel } from "@shared/error-model";
+import { AllCategoriesResponseDto } from "./dto/response.dto";
+import { CategoryDto } from "./dto/category.dto";
 
 @Injectable()
 export class CategoriesService {
@@ -17,48 +19,75 @@ export class CategoriesService {
     private readonly logger: Logger,
   ) {}
 
-  async create(data: Prisma.CategoryCreateInput): Promise<Category> {
-    return this.prisma.category.create({
-      data,
+  async create(
+    data: Prisma.CategoryCreateInput,
+  ): Promise<Omit<CategoryDto, "subCategories" | "_count">> {
+    const isExist = await this.isExist({
+      alias: data.alias,
     });
+    if (isExist) {
+      throw new ConflictException(ErrorModel.CATEGORY_ALREADY_EXISTS);
+    }
+    try {
+      return await this.prisma.category.create({
+        data,
+      });
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(e, e.stack, this.SERVICE);
+      }
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async findOne(params: {
+    take?: number;
+    skip?: number;
     where: Prisma.CategoryWhereUniqueInput;
-    include?: Prisma.CategoryInclude;
-    omit?: Prisma.CategoryOmit;
-    select?: Prisma.CategorySelect;
-  }): Promise<(Category & { countSubCategories: number }) | null> {
+  }): Promise<CategoryDto> {
     const category = await this.prisma.category.findUnique({
-      ...params,
-    });
-    if (!category) {
-      throw new NotFoundException(
-        `Category with ID ${params.where.alias || params.where.id} not found`,
-      );
-    }
-    const countSubCategories = await this.prisma.category.count({
-      where: {
-        parentCategoryId: category.id,
+      where: params.where,
+      include: {
+        _count: true,
+        subCategories: {
+          take: params.take ? +params.take : undefined,
+          skip: params.skip ? +params.skip : undefined,
+        },
       },
     });
-    return { ...category, countSubCategories };
+    if (params.where?.id && !category) {
+      throw new NotFoundException(
+        ErrorModel.CATEGORY_NOT_FOUND(params.where.id, "ID"),
+      );
+    }
+    if (params.where?.id && !category) {
+      throw new NotFoundException(
+        ErrorModel.CATEGORY_NOT_FOUND(params.where.alias, "ALIAS"),
+      );
+    }
+    if (!category) {
+      throw new NotFoundException(ErrorModel.CATEGORY_DOES_NOT_EXIST);
+    }
+    return category;
   }
 
   async findAll(params?: {
+    withSubCategories: boolean;
     skip?: number;
     take?: number;
     where?: Prisma.CategoryWhereInput;
-    orderBy?: Prisma.CategoryOrderByWithRelationInput;
-    omit?: Prisma.CategoryOmit;
-    include?: Prisma.CategoryInclude;
-  }): Promise<ResponseDataType<Category[]>> {
-    const { omit, include, ...restParams } = params;
+    orderBy?: Prisma.CategoryOrderByWithRelationInput[];
+  }): Promise<AllCategoriesResponseDto> {
+    const { withSubCategories, take, skip, ...restParams } = params;
     const [categories, total] = await this.prisma.$transaction([
       this.prisma.category.findMany({
-        ...params,
-        omit,
-        include,
+        ...restParams,
+        take,
+        skip,
+        include: {
+          _count: true,
+          subCategories: withSubCategories,
+        },
       }),
       this.prisma.category.count({
         ...restParams,
@@ -75,7 +104,7 @@ export class CategoriesService {
     user: User;
     where: Prisma.CategoryWhereUniqueInput;
     data: Prisma.CategoryUpdateInput;
-  }): Promise<Category> {
+  }): Promise<Omit<CategoryDto, "subCategories" | "_count">> {
     const { user, ...restParams } = params;
     this.logger.log(
       `Update category with ID ${params.where.id}, body: ${JSON.stringify(restParams.data, null, 2)} user: ${user.id} ${user.email}`,
@@ -90,7 +119,9 @@ export class CategoriesService {
     }
   }
 
-  async remove(where: Prisma.CategoryWhereUniqueInput): Promise<Category> {
+  async remove(
+    where: Prisma.CategoryWhereUniqueInput,
+  ): Promise<Omit<CategoryDto, "subCategories" | "_count">> {
     const category = await this.prisma.category.findUnique({
       where,
       include: {
@@ -99,12 +130,18 @@ export class CategoriesService {
     });
 
     if (!category) {
-      throw new NotFoundException(`Category with ID ${where.id} not found`);
+      throw new NotFoundException(
+        ErrorModel.CATEGORY_NOT_FOUND(where.id, "ID"),
+      );
     }
     if (category.subCategories.length > 0) {
-      await this.prisma.category.deleteMany({
+      await this.prisma.category.updateMany({
         where: {
           parentCategoryId: where.id,
+        },
+        data: {
+          parentCategoryId: null,
+          hidden: true,
         },
       });
     }

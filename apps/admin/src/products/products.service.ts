@@ -1,27 +1,29 @@
 import {
-  BadRequestException,
+  ConflictException,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { UpdateProductDto } from "./dto/update-product.dto";
 import { Prisma, Product, User, PrismaService } from "@libs/prisma-client";
 import { CreateProductDto } from "./dto/create-product.dto";
-import { type ResponseDataType } from "@shared/types";
 import { CategoriesService } from "../categories/categories.service";
 import { HttpService } from "@nestjs/axios";
 import { CreateProductCrmDto } from "./dto/create-product-crm.dto";
 import { CrmProductDto } from "./dto/crm-product.dto";
 import { CreateProductOffersCrmDto } from "./dto/create-product-offers-crm.dto";
 import { CrmProductOffersDto } from "./dto/crm-product-offers.dto";
-import { PrismaClientValidationError } from "@prisma/client/runtime/library";
 import { ErrorModel } from "@shared/error-model";
+import { AllProductsResponseDto } from "./dto/response.dto";
+import { ProductDto } from "./dto/product.dto";
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly category: CategoriesService,
+    private readonly categoryService: CategoriesService,
     private readonly httpService: HttpService,
     private readonly logger: Logger,
   ) {}
@@ -30,10 +32,14 @@ export class ProductsService {
   async create(params: {
     data: CreateProductDto;
     user: User;
-  }): Promise<Product> {
+  }): Promise<
+    Omit<ProductDto, "_count" | "category" | "images" | "productSizes">
+  > {
     const { categoryId, images, productSizes, isCreateOnCrm, ...productData } =
       params.data;
-    const isCategoryExist = await this.category.isExist({ id: categoryId });
+    const isCategoryExist = await this.categoryService.isExist({
+      id: categoryId,
+    });
     if (!isCategoryExist) {
       throw new NotFoundException(ErrorModel.CATEGORY_DOES_NOT_EXIST);
     }
@@ -43,72 +49,65 @@ export class ProductsService {
       },
     });
     if (isExistAlias) {
-      throw new BadRequestException(ErrorModel.PRODUCT_ALIAS_ALREADY_EXISTS);
+      throw new ConflictException(ErrorModel.PRODUCT_ALIAS_ALREADY_EXISTS);
     }
     try {
-      const product = await this.prisma.product.create({
-        include: {
-          images: true,
-          productSizes: true,
-          category: true,
-        },
-        data: {
-          ...productData,
-          category: {
-            connect: { id: categoryId },
-          },
-          images: {
-            create: images.map((image) => ({
-              url: image.url,
-              order: image.order,
-            })),
-          },
-          productSizes: {
-            create: productSizes,
-          },
-        },
-      });
-      if (isCreateOnCrm) {
-        const { crmProduct, crmProductOffers } = await this.createProductInCrm({
-          product,
-          user: params.user,
-        });
-        await this.prisma.product.update({
-          where: {
-            id: product.id,
+      return await this.prisma.$transaction(async (prisma) => {
+        const product = await prisma.product.create({
+          include: {
+            images: true,
+            productSizes: true,
+            category: true,
           },
           data: {
-            keyCrmId: crmProduct.id,
-            productSizes: {
-              updateMany: crmProductOffers.map((offer) => ({
-                data: {
-                  keyCrmId: offer.id,
-                },
-                where: {
-                  sku: offer.sku,
-                },
+            ...productData,
+            category: {
+              connect: { id: categoryId },
+            },
+            images: {
+              create: images.map((image) => ({
+                url: image.url,
+                order: image.order,
               })),
+            },
+            productSizes: {
+              create: productSizes,
             },
           },
         });
-      }
-
-      return product;
+        if (isCreateOnCrm) {
+          const { crmProduct, crmProductOffers } =
+            await this.createProductInCrm({
+              product,
+              user: params.user,
+            });
+          await this.prisma.product.update({
+            where: {
+              id: product.id,
+            },
+            data: {
+              keyCrmId: crmProduct.id,
+              productSizes: {
+                updateMany: crmProductOffers.map((offer) => ({
+                  data: {
+                    keyCrmId: offer.id,
+                  },
+                  where: {
+                    sku: offer.sku,
+                  },
+                })),
+              },
+            },
+          });
+        }
+        return product;
+      });
     } catch (error) {
-      if (error instanceof PrismaClientValidationError) {
-        const match = error.message.match(/Unknown argument `([^`]+)`/);
-        const result = match ? match[1] : null;
-        this.logger.error(error.name, error.stack, this.SERVICE_NAME);
-        throw new BadRequestException(
-          ErrorModel.PRODUCT_CREATE_INCORRECT_BODY(result),
-        );
-      }
-      if (error instanceof Error) {
-        this.logger.error(error.name, error, this.SERVICE_NAME);
-        throw new BadRequestException(ErrorModel.PRODUCT_CREATE_FAILED);
-      }
       this.logger.error(error.name, error, this.SERVICE_NAME);
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -195,15 +194,8 @@ export class ProductsService {
         crmProductOffers: crmProductOffers.data,
       };
     } catch (error) {
-      await this.remove({
-        where: {
-          id: params.product.id,
-        },
-        user: params.user,
-      });
-
       this.logger.error(error.message, error, this.SERVICE_NAME);
-      throw new BadRequestException(
+      throw new InternalServerErrorException(
         ErrorModel.PRODUCT_CREATE_FAILED_WITH_PROBLEM_CRM,
       );
     }
@@ -214,18 +206,20 @@ export class ProductsService {
     take?: number;
     where?: Prisma.ProductWhereInput;
     orderBy?: Prisma.ProductOrderByWithRelationInput[];
-    include?: Prisma.ProductInclude;
-    omit?: Prisma.ProductOmit;
-  }): Promise<ResponseDataType<Product[]>> {
-    const { omit, include, take, skip, orderBy, ...restParams } = params;
+  }): Promise<AllProductsResponseDto> {
+    const { take, skip, orderBy, ...restParams } = params;
     const [products, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         ...params,
         take,
         skip,
         orderBy,
-        include,
-        omit,
+        include: {
+          images: true,
+          productSizes: true,
+          category: true,
+          _count: true,
+        },
       }),
       this.prisma.product.count(restParams),
     ]);
@@ -257,72 +251,103 @@ export class ProductsService {
 
   findOne(params: {
     where: Prisma.ProductWhereUniqueInput;
-    omit?: Prisma.ProductOmit;
-    include?: Prisma.ProductInclude;
-  }): Promise<Product> {
-    return this.prisma.product.findUnique(params);
+  }): Promise<ProductDto> {
+    return this.prisma.product.findUnique({
+      where: params.where,
+      include: {
+        images: true,
+        productSizes: true,
+        category: true,
+        _count: true,
+      },
+    });
   }
 
   async update(params: {
     where: Prisma.ProductWhereUniqueInput;
-    data: UpdateProductDto;
-  }): Promise<Product> {
-    const { where, data } = params;
-    const { categoryId, images, productSizes, ...productData } = data;
-    const isCategoryExist = await this.category.isExist({ id: categoryId });
-    if (!isCategoryExist) {
-      throw new NotFoundException(`Category with ID ${categoryId} not found`);
-    }
-    return this.prisma.product.update({
-      data: {
-        ...productData,
-        category: {
-          connect: { id: categoryId },
-        },
-        images: {
-          deleteMany: {
-            productId: where.id,
-            id: {
-              notIn: images.map((image) => image.id).filter((size) => size),
-            },
-          },
-          upsert: images.map((image) => ({
-            where: { id: image.id || "" },
-            update: { url: image.url },
-            create: {
-              url: image.url,
-              order: image.order,
-            },
-          })),
-        },
-        productSizes: {
-          deleteMany: {
-            productId: where.id,
-            id: {
-              notIn: productSizes.map((size) => size.id).filter((size) => size),
-            },
-          },
-          upsert: productSizes.map((size) => ({
-            where: {
-              id: size.id || "",
-            },
-            update: size,
-            create: size,
-          })),
-        },
-      },
-      where,
-      include: {
-        images: true,
-        productSizes: true,
-      },
+    data: Partial<UpdateProductDto>;
+  }): Promise<ProductDto> {
+    const isCategoryExist = await this.categoryService.isExist({
+      id: params.data.categoryId || "",
     });
+    if (!isCategoryExist && params.data.categoryId) {
+      throw new NotFoundException(
+        ErrorModel.CATEGORY_NOT_FOUND(params.data.categoryId, "ID"),
+      );
+    }
+    try {
+      return this.prisma.$transaction(async (prisma) => {
+        const { images, productSizes, ...productData } = params.data;
+        if (images) {
+          await prisma.product.update({
+            where: params.where,
+            data: {
+              images: {
+                deleteMany: {
+                  productId: params.where.id,
+                  id: {
+                    notIn: images
+                      .map((image) => image.id)
+                      .filter((size) => size),
+                  },
+                },
+                upsert: images.map((image) => ({
+                  where: { id: image.id || "" },
+                  update: { url: image.url },
+                  create: {
+                    url: image.url,
+                    order: image.order,
+                  },
+                })),
+              },
+            },
+          });
+        }
+        if (productSizes) {
+          await prisma.product.update({
+            where: params.where,
+            data: {
+              productSizes: {
+                deleteMany: {
+                  productId: params.where.id,
+                  id: {
+                    notIn: productSizes
+                      .map((size) => size.id)
+                      .filter((size) => size),
+                  },
+                },
+                upsert: productSizes.map((size) => ({
+                  where: {
+                    id: size.id || "",
+                  },
+                  update: size,
+                  create: size,
+                })),
+              },
+            },
+          });
+        }
+        return prisma.product.update({
+          data: productData,
+          where: params.where,
+          include: {
+            images: true,
+            productSizes: true,
+            category: true,
+            _count: true,
+          },
+        });
+      });
+    } catch (error) {
+      this.logger.error(this.SERVICE_NAME, error.name, error);
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async remove(params: {
     where: Prisma.ProductWhereUniqueInput;
     user: User;
-  }): Promise<Product> {
+  }): Promise<ProductDto> {
     const { where, user } = params;
     const product = await this.prisma.product.findUnique({
       where,
@@ -336,6 +361,12 @@ export class ProductsService {
     );
     return this.prisma.product.delete({
       where,
+      include: {
+        images: true,
+        productSizes: true,
+        category: true,
+        _count: true,
+      },
     });
   }
 }

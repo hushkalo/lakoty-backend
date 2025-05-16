@@ -61,7 +61,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       ...params,
       orderBy: {
-        topProduct: "desc",
+        top: "desc",
       },
       take: 7,
       skip:

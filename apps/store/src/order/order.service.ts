@@ -1,10 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { PrismaService } from "@libs/prisma-client";
-import {
-  ProductDoesNotExistError,
-  ProductSizeDoesNotExistError,
-} from "@shared/error-model";
+import { ErrorModel } from "@shared/error-model";
 import { ProductsService } from "../products/products.service";
 
 @Injectable()
@@ -49,7 +46,7 @@ export class OrderService {
         (item) => !findAllProduct.data.some((product) => product.id === item),
       );
       throw new BadRequestException(
-        new ProductDoesNotExistError(notFoundProduct.join(", ")),
+        ErrorModel.PRODUCT_DOES_NOT_EXIST + notFoundProduct.join(", "),
       );
     }
     const findAllProductSize = await this.productsService.findAll({
@@ -71,7 +68,7 @@ export class OrderService {
           ),
       );
       throw new BadRequestException(
-        new ProductSizeDoesNotExistError(notFoundProductSize.join(", ")),
+        ErrorModel.PRODUCT_SIZE_NOT_FOUND + notFoundProductSize.join(", "),
       );
     }
     return this.prisma.order.create({

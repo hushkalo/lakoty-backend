@@ -12,8 +12,8 @@ import {
   CategoriesResponseDto,
   CategoryWithCountSubCategoriesResponseDto,
 } from "./dto/responses.dto";
-import { InternalServerError } from "@shared/error-model";
 import { TreeCategoryDto } from "./dto/category.dto";
+import { AppError, ErrorModel } from "@shared/error-model";
 
 @ApiTags("Categories")
 @Controller("categories")
@@ -59,7 +59,8 @@ export class CategoriesController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   getAllCategories(
     @Query("take") take?: number,
@@ -127,7 +128,8 @@ export class CategoriesController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   getTreeCategories(
     @Query("flat") flat: string,
@@ -160,7 +162,8 @@ export class CategoriesController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   getCategory(@Param("id") id: string) {
     return this.categoryService.findOne({
@@ -178,7 +181,8 @@ export class CategoriesController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   async getCategoryByAlias(
     @Param("alias") alias: string,

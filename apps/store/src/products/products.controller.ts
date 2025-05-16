@@ -13,7 +13,7 @@ import {
   ProductWithRecommendationResponseDto,
 } from "./dto/responses.dto";
 import { ProductDto } from "./dto/product.dto";
-import { InternalServerError } from "@shared/error-model";
+import { AppError, ErrorModel } from "@shared/error-model";
 
 @ApiTags("Products")
 @Controller("products")
@@ -83,7 +83,8 @@ export class ProductsController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   findAll(
     @Query("take") take?: number,
@@ -113,7 +114,7 @@ export class ProductsController {
       },
       orderBy: [
         {
-          topProduct: sortBy === "popular" ? "desc" : undefined,
+          top: sortBy === "popular" ? "desc" : undefined,
         },
         {
           price: sortBy === "chipper" ? "asc" : undefined,
@@ -141,7 +142,8 @@ export class ProductsController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   findOne(@Param("id") id: string): Promise<ProductDto> {
     return this.productsService.findOne({
@@ -159,7 +161,8 @@ export class ProductsController {
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
-    type: InternalServerError,
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   async findAlias(
     @Param("alias") alias: string,

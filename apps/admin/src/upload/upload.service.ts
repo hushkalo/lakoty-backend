@@ -7,6 +7,11 @@ import { HttpService } from "@nestjs/axios";
 import { AxiosError } from "axios";
 import FormData from "form-data";
 import { type TKeyCRMAddFile } from "@shared/types";
+import { ErrorModel } from "@shared/error-model";
+import {
+  UploadMultipleResponseDto,
+  UploadResponseDto,
+} from "./dto/response.dto";
 
 @Injectable()
 export class UploadService {
@@ -18,7 +23,7 @@ export class UploadService {
 
   async uploadFile(params: {
     file: Express.Multer.File;
-  }): Promise<{ url: string }> {
+  }): Promise<UploadResponseDto> {
     const { file } = params;
     try {
       const formData = new FormData();
@@ -38,16 +43,18 @@ export class UploadService {
     } catch (error) {
       if (error instanceof AxiosError) {
         this.logger.error(error.message, error.stack, this.SERVICE);
-        throw new InternalServerErrorException("Failed to upload file");
+        throw new InternalServerErrorException(
+          ErrorModel.UPLOAD_FAILED_WITH_PROBLEM_CRM,
+        );
       }
       this.logger.error(error, this.SERVICE);
-      throw new InternalServerErrorException("Failed to upload file");
+      throw new InternalServerErrorException(ErrorModel.UPLOAD_FAILED);
     }
   }
 
   async uploadFiles(params: {
     files: Express.Multer.File[];
-  }): Promise<{ url: string }[]> {
+  }): Promise<UploadMultipleResponseDto[]> {
     const { files } = params;
     console.log(
       files.map((file) => (file.size / Math.pow(1024, 2)).toFixed(2) + " MB"),
@@ -70,7 +77,7 @@ export class UploadService {
           url: `https://lakotiy.api.keycrm.app/file-storage/thumbnails/lakotiy${response.data.directory}${response.data.file_name}`,
         };
       });
-      return Promise.all(imagePromises);
+      return await Promise.all(imagePromises);
     } catch (error) {
       if (error instanceof AxiosError) {
         this.logger.error(error.message, error.stack, this.SERVICE);

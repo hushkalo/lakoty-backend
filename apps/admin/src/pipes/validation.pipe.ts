@@ -17,10 +17,24 @@ export class ValidationPipe implements PipeTransform {
     const object = plainToInstance<object, string>(metatype, value);
     const errors = await validate(object);
     if (errors.length > 0) {
-      const errorsReason = errors.map((error) => ({
-        key: error.property,
-        constraints: error.constraints,
-      }));
+      const errorsReason = errors.map((error) => {
+        if (error.children && error.children.length > 0) {
+          return {
+            key: error.property,
+            constraints: error.children.map((child) => ({
+              index: child.property,
+              values: child?.children.map((value) => ({
+                key: value.property,
+                constraints: value.constraints,
+              })),
+            })),
+          };
+        }
+        return {
+          key: error.property,
+          constraints: error.constraints,
+        };
+      });
       throw new BadRequestException({
         ...ErrorModel.VALIDATION_FAILED,
         errorsReason,

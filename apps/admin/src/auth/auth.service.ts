@@ -1,8 +1,10 @@
 import {
-  BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { LoginDto, RegisterDto } from "./dto/create-auth.dto";
 import { UserService } from "../user/user.service";
@@ -12,7 +14,7 @@ import {
   PrismaService,
 } from "@libs/prisma-client";
 import { JwtService } from "@nestjs/jwt";
-import { LoginResponseDto } from "./dto/responses.dto";
+import { CookieDto } from "./dto/responses.dto";
 import { comparePassword } from "../utils/bcrypt.util";
 import { ConfigService } from "@nestjs/config";
 import { EnvironmentVariablesForAdmin } from "@shared/configuration";
@@ -30,22 +32,31 @@ export class AuthService {
     private readonly configService: ConfigService<EnvironmentVariablesForAdmin>,
   ) {}
 
-  async signIn(data: LoginDto): Promise<LoginResponseDto> {
+  async signIn(data: LoginDto): Promise<CookieDto> {
     const user = await this.validateUser(data);
-    const session = await this.createSession(user);
-    this.logger.log(
-      `Creating session for user - ${user.email}, session - ${session.id}`,
-      this.SERVICE,
-    );
-    return {
-      accessToken: await this.jwtService.signAsync(
-        { sub: user.id },
-        {
-          expiresIn: this.configService.get("JWT_ACCESS_TOKEN_EXPIRES_IN"),
-        },
-      ),
-      sessionId: session.id,
-    };
+    try {
+      const session = await this.createSession(user);
+      this.logger.log(
+        `Creating session for user - ${user.email}, session - ${session.id}`,
+        this.SERVICE,
+      );
+      return {
+        accessToken: await this.jwtService.signAsync(
+          { sub: user.id },
+          {
+            expiresIn: this.configService.get("JWT_ACCESS_TOKEN_EXPIRES_IN"),
+          },
+        ),
+        sessionId: session.id,
+      };
+    } catch (error) {
+      this.logger.error(
+        `${ErrorModel.SESSION_CREATE_FAILED.message} - ${user.email}`,
+        this.SERVICE,
+        error,
+      );
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async signUp(data: RegisterDto): Promise<Omit<User, "password">> {
@@ -59,18 +70,9 @@ export class AuthService {
         `${ErrorModel.USER_ALREADY_EXISTS.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException(ErrorModel.USER_PASSWORD_NOT_MATCH);
+      throw new ConflictException(ErrorModel.USER_ALREADY_EXISTS);
     }
-    if (data.password !== data.confirmPassword) {
-      this.logger.error(
-        `${ErrorModel.USER_PASSWORD_NOT_MATCH.message} - ${data.email}`,
-        this.SERVICE,
-      );
-      throw new BadRequestException(ErrorModel.USER_PASSWORD_NOT_MATCH);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { confirmPassword, ...rest } = data;
-    return this.usersService.create(rest);
+    return this.usersService.create(user);
   }
 
   validateUserById(id: string): Promise<Omit<User, "password">> {
@@ -93,7 +95,7 @@ export class AuthService {
 
   async refreshTokens(
     sessionId: string | undefined,
-  ): Promise<Omit<LoginResponseDto, "sessionId">> {
+  ): Promise<Omit<CookieDto, "sessionId">> {
     const session = await this.prisma.userSession.findUnique({
       where: {
         id: sessionId,
@@ -104,7 +106,7 @@ export class AuthService {
         `${ErrorModel.SESSION_NOT_FOUND.message} - ${sessionId}`,
         this.SERVICE,
       );
-      throw new BadRequestException(ErrorModel.SESSION_NOT_FOUND);
+      throw new UnauthorizedException(ErrorModel.SESSION_NOT_FOUND);
     }
     try {
       const refreshToken = await this.jwtService.verifyAsync<{ sub: string }>(
@@ -134,7 +136,7 @@ export class AuthService {
       }
 
       this.logger.error("Error while refreshing tokens", this.SERVICE, error);
-      throw new InternalServerErrorException();
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -149,22 +151,22 @@ export class AuthService {
         `${ErrorModel.USER_DOES_NOT_EXIST.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException(ErrorModel.USER_DOES_NOT_EXIST);
+      throw new NotFoundException(ErrorModel.USER_DOES_NOT_EXIST);
     }
+    const { password, ...userData } = user;
     const isPasswordMatch = await comparePassword({
       password: data.password,
-      hashedPassword: user.password,
+      hashedPassword: password,
     });
     if (!isPasswordMatch) {
       this.logger.error(
         `${ErrorModel.USER_PASSWORD_NOT_MATCH.message} - ${data.email}`,
         this.SERVICE,
       );
-      throw new BadRequestException(ErrorModel.USER_INVALID_CREDENTIALS);
+      throw new UnauthorizedException(ErrorModel.USER_INVALID_CREDENTIALS);
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...result } = user;
-    return result;
+
+    return userData;
   }
 
   private async createSession(

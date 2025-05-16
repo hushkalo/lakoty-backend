@@ -17,14 +17,6 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService<EnvironmentVariablesForAdmin>);
 
-  // app.enableCors({
-  //   methods: "POST",
-  //   origin: [configService.get("CORS_ORIGIN")],
-  //   credentials: true,
-  //   preflightContinue: false,
-  //   optionsSuccessStatus: 204,
-  // });
-
   app.setGlobalPrefix("api/admin");
   if (
     configService.get("NODE_ENV") === "development" ||
@@ -40,9 +32,20 @@ async function bootstrap() {
       .setTitle("Lakoty Store API")
       .setDescription("The Lakoty Store API description")
       .setVersion("0.1")
+      .addServer("http://localhost:8080")
       .build();
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup("api", app, document);
+    SwaggerModule.setup("/api/admin/swagger", app, document, {
+      jsonDocumentUrl: "/api/admin/swagger/json",
+    });
+  } else {
+    app.enableCors({
+      methods: ["POST", "GET", "PUT", "PATCH", "DELETE"],
+      origin: [configService.get("CORS_ORIGIN")],
+      credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    });
   }
   app.use(json({ limit: configService.get("BODY_LIMIT") || "1mb" }));
   app.use(cookieParser());

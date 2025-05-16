@@ -3,8 +3,7 @@ import { CategoriesModule } from "./categories/categories.module";
 import { PrismaModule } from "@libs/prisma-client";
 import { ProductsModule } from "./products/products.module";
 import { ConfigModule } from "@nestjs/config";
-import { validate } from "@shared/configuration";
-import { configuration } from "./config/configuration";
+import { validate, configuration } from "@shared/configuration";
 import { OrderModule } from "./order/order.module";
 import { NovaPostModule } from "./nova-post/nova-post.module";
 
