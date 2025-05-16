@@ -12,9 +12,9 @@ import {
   ArrayMinSize,
   IsOptional,
 } from "class-validator";
-import { ProductImage, ProductSize } from "./create-product.dto";
+import { CreateProductImage, CreateProductSize } from "./create-product.dto";
 
-export class UpdateProductImage extends ProductImage {
+export class UpdateProductImage extends CreateProductImage {
   @ApiProperty({
     description: "Unique identifier",
     example: "img-123",
@@ -25,7 +25,7 @@ export class UpdateProductImage extends ProductImage {
   id: string;
 }
 
-export class UpdateProductSize extends ProductSize {
+export class UpdateProductSize extends CreateProductSize {
   @ApiProperty({
     description: "Unique identifier",
     example: "size-123",

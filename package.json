@@ -1,6 +1,6 @@
 {
   "name": "lakotiy-backend",
-  "version": "2.10.2",
+  "version": "2.11.2",
   "description": "",
   "author": "",
   "private": true,
@@ -19,7 +19,7 @@
     "prisma:generate": "prisma generate --schema=libs/prisma-schema/prisma/schema.prisma",
     "prisma:migrate": "dotenv -e apps/admin/.env.development -- prisma migrate dev --schema=libs/prisma-schema/prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=libs/prisma-schema/prisma/schema.prisma",
-    "prisma:seed": "ts-node libs/prisma-schema/prisma/seed.ts"
+    "prisma:seed": "dotenv -e apps/admin/.env.development -- prisma db seed"
   },
   "dependencies": {
     "@eslint/js": "^9.22.0",
@@ -118,7 +118,7 @@
     "testEnvironment": "node"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node libs/prisma-schema/prisma/seed.ts"
   },
   "overrides": {
     "superagent": "^10.1.1",

@@ -14,7 +14,7 @@ import {
   IsOptional,
 } from "class-validator";
 
-export class ProductImage {
+export class CreateProductImage {
   @ApiProperty({
     description: "URL of the product image",
     example: "https://example.com/image.jpg",
@@ -32,7 +32,7 @@ export class ProductImage {
   order: number;
 }
 
-export class ProductSize {
+export class CreateProductSize {
   @ApiProperty({
     description: "Name of the product size",
     example: "XL",
@@ -119,13 +119,13 @@ export class CreateProductDto {
 
   @ApiProperty({
     description: "Array of product images",
-    type: [ProductImage],
+    type: [CreateProductImage],
   })
   @IsArray()
   @ValidateNested({ each: true })
   @ArrayMinSize(1)
-  @Type(() => ProductImage)
-  images: ProductImage[];
+  @Type(() => CreateProductImage)
+  images: CreateProductImage[];
 
   @ApiProperty({
     description: "Discount percentage for the product",
@@ -147,7 +147,7 @@ export class CreateProductDto {
 
   @ApiProperty({
     description: "Available sizes for the product",
-    type: ProductSize,
+    type: CreateProductSize,
     isArray: true,
     required: false,
   })
@@ -155,8 +155,8 @@ export class CreateProductDto {
   @IsArray()
   @ValidateNested({ each: true })
   @ArrayMinSize(1)
-  @Type(() => ProductSize)
-  productSizes?: ProductSize[];
+  @Type(() => CreateProductSize)
+  productSizes?: CreateProductSize[];
 
   @ApiProperty({
     description: "Flag indicating if the product should be created in CRM",
