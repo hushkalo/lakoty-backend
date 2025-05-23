@@ -76,7 +76,7 @@ type TResponse<T> = {
 };
 // initialize Prisma Client
 const prisma = new PrismaClient();
-const urlKeyCrm = process.env["KEY_CRM_API"];
+const urlKeyCrm = process.env["CRM_API_URL"];
 const secretKey = process.env["CRM_API_KEY"];
 async function getProductSizes(params: {
   productId: number;
@@ -151,6 +151,10 @@ async function seedCategories() {
         description: "string",
         keyCrmId: category.id,
         imageUrl: "",
+        depth: 0,
+        pathname: {
+          set: [transliteration(category.name)],
+        },
       },
     });
     console.log(i, ". create parent category: ", parentCategory);
@@ -167,6 +171,13 @@ async function seedCategories() {
           keyCrmId: childCategory.id,
           imageUrl: "",
           parentCategoryId: parentCategory.id,
+          depth: 1,
+          pathname: {
+            set: [
+              ...parentCategory.pathname,
+              transliteration(childCategory.name),
+            ],
+          },
         },
       });
       console.log(j, ". create child category: ", createCategory);

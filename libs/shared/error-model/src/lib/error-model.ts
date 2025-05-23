@@ -27,7 +27,17 @@ export class ErrorModel {
   // Category errors
   static readonly CATEGORY_ALREADY_EXISTS = {
     error_code: "CATEGORY_ALREADY_EXISTS",
-    message: "Category already exists.",
+    message: "Category with this alias already exists.",
+  };
+  static readonly CATEGORY_DEPTH_MUST_BE_LESS_THEN_PARENT_CATEGORY = {
+    error_code: "CATEGORY_DEPTH_MUST_BE_LESS_THEN_PARENT_CATEGORY",
+    message:
+      "Category depth must be less than or equal to the parent category.",
+  };
+  static readonly CATEGORY_DOES_NOT_BE_CHILD_OWN_CATEGORY = {
+    error_code: "CATEGORY_DOES_NOT_BE_CHILD_OWN_CATEGORY",
+    message:
+      "Category cannot be a child of its own category. Please check the parent category.",
   };
   static readonly CATEGORY_DOES_NOT_EXIST = {
     error_code: "CATEGORY_NOT_FOUND",

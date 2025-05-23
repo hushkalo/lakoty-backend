@@ -49,6 +49,7 @@ export class CreateCategoryDto {
 
   @ApiProperty({
     required: false,
+    nullable: true,
     description: "ID of the parent category if this is a subcategory",
     example: "507f1f77bcf86cd799439012",
   })

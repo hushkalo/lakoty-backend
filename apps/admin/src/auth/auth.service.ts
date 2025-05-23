@@ -106,7 +106,9 @@ export class AuthService {
         `${ErrorModel.SESSION_NOT_FOUND.message} - ${sessionId}`,
         this.SERVICE,
       );
-      throw new UnauthorizedException(ErrorModel.SESSION_NOT_FOUND);
+      return {
+        accessToken: null,
+      };
     }
     try {
       const refreshToken = await this.jwtService.verifyAsync<{ sub: string }>(

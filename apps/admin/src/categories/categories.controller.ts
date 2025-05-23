@@ -94,6 +94,7 @@ export class CategoriesController {
           contains: searchString,
           mode: "insensitive",
         },
+        isDeleted: false,
       },
       withSubCategories: withSubCategories === "true",
       orderBy: [
@@ -244,6 +245,11 @@ export class CategoriesController {
     description: "Category already exists",
     type: AppError,
     example: ErrorModel.CATEGORY_ALREADY_EXISTS,
+  })
+  @ApiNotFoundResponse({
+    description: "Parent category not found",
+    type: AppError,
+    example: ErrorModel.CATEGORY_NOT_FOUND("clt0yzpbi0000mt08g3l0w123", "ID"),
   })
   @ApiBody({
     type: CreateCategoryDto,

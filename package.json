@@ -1,15 +1,16 @@
 {
   "name": "lakotiy-backend",
-  "version": "2.11.3",
+  "version": "2.12.0",
   "description": "",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "build": "nest build",
     "build:store": "cross-env NODE_ENV=production nx build store --configuration=production",
     "build:admin": "cross-env NODE_ENV=production nx build admin --configuration=production",
     "build:libs": "nx build libs --configuration=production",
-    "build:all": " nx run-many --target=build --all --configuration=production",
+    "build:all": "nx run-many --target=build --all --configuration=production",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:dev:admin": "cross-env NODE_ENV=development nx serve admin --configuration=development",
     "start:prod:admin": "node dist/apps/admin/main",

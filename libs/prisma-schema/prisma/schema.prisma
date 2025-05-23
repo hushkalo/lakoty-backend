@@ -30,6 +30,7 @@ model Category {
   top              Boolean    @default(false)
   pathname         String[]
   products         Product[]
+  isDeleted        Boolean    @default(false)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 }
@@ -51,6 +52,7 @@ model Product {
   categoryId   String
   images       ProductImage[]
   productSizes ProductSize[]
+  isDeleted    Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -143,6 +145,7 @@ model Order {
   paymentType      String
   messengerType    String
   cityArea         String
+  isDeleted        Boolean        @default(false)
   statusId         Int            @default(1)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
