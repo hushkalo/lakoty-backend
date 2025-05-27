@@ -44,10 +44,9 @@ export class CreateProductSize {
   @ApiProperty({
     description: "Stock keeping unit (SKU) code",
     example: "XL-BLU-123",
+    nullable: true,
   })
-  @IsString()
-  @IsNotEmpty()
-  sku: string;
+  sku: string | null;
 
   @ApiProperty({
     description: "Available quantity for this size",

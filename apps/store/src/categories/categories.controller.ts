@@ -91,7 +91,6 @@ export class CategoriesController {
         },
       ],
       withSubCategories: withSubCategories === "true",
-      searchString: searchString || "",
     });
   }
 

@@ -14,9 +14,17 @@ export class CategoriesService {
     where: Prisma.CategoryWhereUniqueInput;
   }): Promise<CategoryWithCountSubCategoriesResponseDto> {
     const category = await this.prisma.category.findUnique({
-      ...params,
+      where: {
+        ...params.where,
+        isDeleted: false,
+        hidden: false,
+      },
       include: {
         parentCategory: {
+          where: {
+            isDeleted: false,
+            hidden: false,
+          },
           omit: {
             keyCrmId: true,
             createdAt: true,
@@ -24,6 +32,10 @@ export class CategoriesService {
           },
         },
         subCategories: {
+          where: {
+            isDeleted: false,
+            hidden: false,
+          },
           omit: {
             keyCrmId: true,
             createdAt: true,
@@ -55,27 +67,33 @@ export class CategoriesService {
 
   async findAll(params?: {
     withSubCategories: boolean;
-    searchString: string;
     skip?: number;
     take?: number;
     where?: Prisma.CategoryWhereInput;
     orderBy?: Prisma.CategoryOrderByWithRelationInput[];
   }): Promise<CategoriesResponseDto> {
-    const { withSubCategories, searchString, ...restParams } = params;
+    const { withSubCategories, where, ...restParams } = params;
     const count = await this.countCategories({
       where: {
-        parentCategoryId: params.where.parentCategoryId,
-        name: {
-          contains: searchString,
-          mode: "insensitive",
-        },
+        ...where,
+        isDeleted: false,
+        hidden: false,
       },
     });
     const data = await this.prisma.category.findMany({
       ...restParams,
+      where: {
+        ...where,
+        isDeleted: false,
+        hidden: false,
+      },
       include: {
         subCategories: withSubCategories
           ? {
+              where: {
+                isDeleted: false,
+                hidden: false,
+              },
               omit: {
                 keyCrmId: true,
                 createdAt: true,
@@ -150,6 +168,10 @@ export class CategoriesService {
     }
 
     const data = await this.prisma.category.findMany({
+      where: {
+        isDeleted: false,
+        hidden: false,
+      },
       omit: {
         keyCrmId: true,
         createdAt: true,
