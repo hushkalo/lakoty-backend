@@ -40,9 +40,10 @@ async function bootstrap() {
     });
   }
 
+  const origins: string[] = (await configService.get("CORS_ORIGIN")).split(",");
   app.enableCors({
     methods: ["GET", "POST"],
-    origin: [configService.get("CORS_ORIGIN")],
+    origin: origins,
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
