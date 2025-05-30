@@ -127,6 +127,8 @@ export function validate(config: Record<string, unknown>) {
   logger.debug("NODE_ENV: " + validatedConfig.NODE_ENV);
   logger.debug("BASE_PORT: " + validatedConfig.BASE_URL);
   logger.debug("DATABASE_URL: " + validatedConfig.DATABASE_URL);
-  logger.debug("CORS_ORIGIN: " + validatedConfig.CORS_ORIGIN);
+  logger.debug(
+    "CORS_ORIGIN: " + JSON.stringify(validatedConfig.CORS_ORIGIN.split(",")),
+  );
   return validatedConfig;
 }

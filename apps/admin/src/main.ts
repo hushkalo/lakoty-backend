@@ -39,9 +39,12 @@ async function bootstrap() {
       jsonDocumentUrl: "/api/admin/swagger/json",
     });
   } else {
+    const origins: string[] = (await configService.get("CORS_ORIGIN")).split(
+      ",",
+    );
     app.enableCors({
       methods: ["POST", "GET", "PUT", "PATCH", "DELETE"],
-      origin: [configService.get("CORS_ORIGIN")],
+      origin: origins,
       credentials: true,
       preflightContinue: false,
       optionsSuccessStatus: 204,

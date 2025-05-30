@@ -140,4 +140,4 @@ export class RecommendationProductDto extends OmitType(ProductDto, [
   "keyCrmId",
   "quantity",
   "productSizes",
-] as const) {}
+]) {}
