@@ -60,17 +60,18 @@ class EnvironmentValidationShared {
 
   @IsString()
   NOVA_POST_API_KEY: string;
+
   @IsString()
   NOVA_POST_API_URL: string;
-}
 
-export class EnvironmentVariablesForAdmin extends EnvironmentValidationShared {
   @IsString()
   CRM_API_URL: string;
 
   @IsString()
   CRM_API_KEY: string;
+}
 
+export class EnvironmentVariablesForAdmin extends EnvironmentValidationShared {
   @IsString()
   JWT_SECRET: string;
 
@@ -87,7 +88,7 @@ export function validate(config: Record<string, unknown>) {
   if (config["TYPE_REPO"] === undefined) {
     throw new Error("typeRepo is not defined");
   }
-  if (config["typeRepo"] === "admin") {
+  if (config["TYPE_REPO"] === "admin") {
     const validatedConfig = plainToInstance(
       EnvironmentVariablesForAdmin,
       config,
@@ -107,6 +108,9 @@ export function validate(config: Record<string, unknown>) {
     logger.debug("BASE_PORT: " + validatedConfig.BASE_URL);
     logger.debug("DATABASE_URL: " + validatedConfig.DATABASE_URL);
     logger.debug("CRM_API_URL: " + validatedConfig.CORS_ORIGIN);
+    logger.debug(
+      "CORS_ORIGIN: " + JSON.stringify(validatedConfig.CORS_ORIGIN.split(",")),
+    );
     return validatedConfig;
   }
   const validatedConfig = plainToInstance(

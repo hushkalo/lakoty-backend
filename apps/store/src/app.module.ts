@@ -6,6 +6,7 @@ import { ConfigModule } from "@nestjs/config";
 import { validate, configuration } from "@shared/configuration";
 import { OrderModule } from "./order/order.module";
 import { NovaPostModule } from "./nova-post/nova-post.module";
+import { CourseModule } from "./course/course.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { NovaPostModule } from "./nova-post/nova-post.module";
     ProductsModule,
     OrderModule,
     NovaPostModule,
+    CourseModule,
     ConfigModule.forRoot({
       envFilePath: `apps/store/.env.${process.env.NODE_ENV ?? "development"}`,
       load: [configuration],
