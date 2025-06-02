@@ -80,6 +80,10 @@ export class ErrorModel {
     error_code: "PRODUCT_SIZE_NOT_FOUND",
     message: "Product size not found.",
   };
+  static readonly PRODUCT_NOT_FOUND_IN_CRM = {
+    error_code: "PRODUCT_NOT_FOUND_IN_CRM",
+    message: "Product size already exists.",
+  };
   // User errors
   static readonly USER_ALREADY_EXISTS = {
     error_code: "USER_ALREADY_EXISTS",

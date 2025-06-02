@@ -344,6 +344,25 @@ export class ProductsService {
     }
   }
 
+  async getProductFromCrm(params: { id: number }): Promise<CrmProductDto> {
+    try {
+      const { data } = await this.httpService.axiosRef.get<CrmProductDto>(
+        `/products/${params.id}`,
+      );
+      return data;
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch product from CRM with ID ${params.id}`,
+        error,
+        this.SERVICE_NAME,
+      );
+      if (error.response?.status === 404) {
+        throw new NotFoundException(ErrorModel.PRODUCT_NOT_FOUND_IN_CRM);
+      }
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   async remove(params: {
     where: Prisma.ProductWhereUniqueInput;
     user: User;

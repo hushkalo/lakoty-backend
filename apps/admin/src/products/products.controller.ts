@@ -30,12 +30,14 @@ import {
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
   ApiCreatedResponse,
+  ApiInternalServerErrorResponse,
 } from "@nestjs/swagger";
 import {
   AppError,
   AppErrorValidationWithArray,
   ErrorModel,
 } from "@shared/error-model";
+import { CrmProductDto } from "./dto/crm-product.dto";
 
 @ApiTags("Products")
 @Controller("products")
@@ -346,6 +348,33 @@ export class ProductsController {
     return this.productsService.findOne({
       where: { id },
     });
+  }
+
+  @ApiOperation({ summary: "Get product from CRM by ID" })
+  @ApiParam({ name: "id", description: "Product ID" })
+  @ApiResponse({
+    status: 200,
+    description: "Product successfully retrieved from CRM",
+    type: CrmProductDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Unauthorized",
+    type: AppError,
+    example: ErrorModel.USER_UNAUTHORIZED,
+  })
+  @ApiNotFoundResponse({
+    description: "Product not found in CRM",
+    type: AppError,
+    example: ErrorModel.PRODUCT_DOES_NOT_EXIST,
+  })
+  @ApiInternalServerErrorResponse({
+    description: "Internal server error",
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
+  })
+  @Get("keycrm/:id")
+  getProductFromCrm(@Param("id") id: number): Promise<CrmProductDto> {
+    return this.productsService.getProductFromCrm({ id });
   }
 
   @ApiOperation({ summary: "Get product by alias" })
