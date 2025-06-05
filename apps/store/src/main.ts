@@ -24,9 +24,12 @@ async function bootstrap() {
     configService.get("NODE_ENV") === "stage"
   ) {
     app.enableCors({
-      methods: "POST,PATCH",
-      origin: ["http://localhost:5173", "http://localhost:4173"],
-      credentials: true,
+      methods: ["GET", "POST"],
+      origin: [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:4173",
+      ],
     });
     const config = new DocumentBuilder()
       .setTitle("Lakoty Store API")
@@ -44,7 +47,6 @@ async function bootstrap() {
   app.enableCors({
     methods: ["GET", "POST"],
     origin: origins,
-    credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });

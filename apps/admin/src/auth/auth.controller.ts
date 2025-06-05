@@ -191,5 +191,6 @@ export class AuthController {
     res.json({
       message: "Refresh success",
     });
+    return;
   }
 }

@@ -145,6 +145,7 @@ model Order {
   paymentType      String
   messengerType    String
   cityArea         String
+  callCustomer     Boolean        @default(false)
   isDeleted        Boolean        @default(false)
   statusId         Int            @default(1)
   createdAt        DateTime       @default(now())

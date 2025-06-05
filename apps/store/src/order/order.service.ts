@@ -13,25 +13,24 @@ export class OrderService {
 
   async create(params: { data: CreateOrderDto }) {
     const { orderProducts, ...rest } = params.data;
-    const { productIds, productSizeIds } = orderProducts.reduce(
+    const { productIds, sizeIds } = orderProducts.reduce(
       (
         acc: {
           productIds: string[];
-          productSizeIds: string[];
+          sizeIds: string[];
         },
         item,
       ) => {
         const productId = item.productId;
-        const productSizeId = item.size.productSizeId;
-
+        const productSizeId = item.size.id;
         return {
           productIds: [...acc.productIds, productId],
-          productSizeIds: [...acc.productSizeIds, productSizeId],
+          sizeIds: [...acc.sizeIds, productSizeId],
         };
       },
       {
         productIds: [],
-        productSizeIds: [],
+        sizeIds: [],
       },
     );
     const findAllProduct = await this.productsService.findAll({
@@ -54,14 +53,14 @@ export class OrderService {
         productSizes: {
           some: {
             id: {
-              in: productSizeIds,
+              in: sizeIds,
             },
           },
         },
       },
     });
-    if (findAllProductSize.total !== productSizeIds.length) {
-      const notFoundProductSize = productSizeIds.filter(
+    if (findAllProductSize.total !== sizeIds.length) {
+      const notFoundProductSize = sizeIds.filter(
         (item) =>
           !findAllProductSize.data.some((product) =>
             product.productSizes.some((size) => size.id === item),
@@ -86,8 +85,7 @@ export class OrderService {
               quantity: item.quantity,
               price: item.price,
               discount: item.discount,
-              sizeId:
-                item.size.name === "base" ? undefined : item.size.productSizeId,
+              sizeId: item.size.name === "base" ? undefined : item.size.id,
             })),
           },
         },

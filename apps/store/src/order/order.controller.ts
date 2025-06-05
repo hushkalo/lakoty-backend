@@ -1,7 +1,8 @@
 import { Controller, Post, Body, UsePipes } from "@nestjs/common";
 import { OrderService } from "./order.service";
-import { CreateOrderDto } from "./dto/create-order.dto";
 import {
+  ApiBadRequestResponse,
+  ApiBody,
   ApiInternalServerErrorResponse,
   ApiOperation,
   ApiResponse,
@@ -10,21 +11,20 @@ import {
 import { CreateOrderResponseDto } from "./dto/responses.dto";
 import { OrderValidationPipe } from "../pipes/order-validation.pipe";
 import { AppError, ErrorModel } from "@shared/error-model";
+import { CreateOrderDto } from "./dto/create-order.dto";
 
 @ApiTags("Orders")
 @Controller("orders")
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
-  @Post()
   @ApiOperation({ summary: "Create new order" })
   @ApiResponse({
     status: 201,
     description: "The order has been successfully created.",
     type: CreateOrderResponseDto,
   })
-  @ApiResponse({
-    status: 400,
+  @ApiBadRequestResponse({
     description: "Not found product by id",
     type: AppError,
     examples: {
@@ -115,18 +115,14 @@ export class OrderController {
             "quantity must be a number conforming to the specified constraints",
           ],
           "orderProducts.0.size": ["size must be provided"],
-          "orderProducts.0.size.productSizeId": [
-            "productId must be a valid CUID",
-            "productSizeId should not be empty",
-            "productSizeId must be a string",
+          "orderProducts.0.size.id": [
+            "id must be a valid CUID",
+            "id should not be empty",
+            "id must be a string",
           ],
           "orderProducts.0.size.name": [
             "name should not be empty",
             "name must be a string",
-          ],
-          "orderProducts.0.size.limit": [
-            "limit must not be less than 0",
-            "limit must be a number conforming to the specified constraints",
           ],
         },
       },
@@ -137,7 +133,12 @@ export class OrderController {
     type: AppError,
     example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
+  @ApiBody({
+    description: "Create order data",
+    type: CreateOrderDto,
+  })
   @UsePipes(OrderValidationPipe)
+  @Post()
   create(@Body() body: CreateOrderDto) {
     return this.orderService.create({ data: body });
   }

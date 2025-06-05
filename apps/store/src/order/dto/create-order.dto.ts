@@ -12,6 +12,7 @@ import {
   Matches,
   IsEnum,
   IsDefined,
+  IsBoolean,
 } from "class-validator";
 import { IsCUID } from "../../validations/is-cuid.validation";
 
@@ -21,6 +22,7 @@ export enum PaymentType {
 }
 
 export enum MessengerType {
+  EMAIL = "EMAIL",
   TELEGRAM = "TELEGRAM",
   VIBER = "VIBER",
   WHATSAPP = "WHATSAPP",
@@ -29,23 +31,20 @@ export enum MessengerType {
 
 class CreateOrderProductSizeDto {
   @ApiProperty({
-    description: "Product size ID",
+    description: "Size ID",
     example: "clhlw1mlq0000ksvm3gfy3eur",
+    required: false,
   })
   @IsString()
   @IsNotEmpty()
-  @IsCUID({ message: "productId must be a valid CUID" })
-  productSizeId: string;
+  @IsCUID({ message: "id must be a valid CUID" })
+  @IsOptional()
+  id: string;
 
   @ApiProperty({ description: "Size name", example: "Large" })
   @IsString()
   @IsNotEmpty()
   name: string;
-
-  @ApiProperty({ description: "Size limit", example: 10 })
-  @IsNumber()
-  @Min(0)
-  limit: number;
 }
 
 class OrderProductDto {
@@ -178,11 +177,19 @@ export class CreateOrderDto {
   @IsNotEmpty()
   warehouseRef: string;
 
-  @ApiProperty({ description: "Payment type", example: "CASH" })
+  @ApiProperty({
+    description: "Payment type",
+    example: "CASH",
+    enum: PaymentType,
+  })
   @IsEnum(PaymentType)
   paymentType: PaymentType;
 
-  @ApiProperty({ description: "Type of messenger", example: "TELEGRAM" })
+  @ApiProperty({
+    description: "Type of messenger",
+    example: "TELEGRAM",
+    enum: MessengerType,
+  })
   @IsEnum(MessengerType)
   messengerType: MessengerType;
 
@@ -190,6 +197,13 @@ export class CreateOrderDto {
   @IsString()
   @IsNotEmpty()
   cityArea: string;
+
+  @ApiProperty({
+    description: "Flag to indicate if customer should be called",
+    example: true,
+  })
+  @IsBoolean()
+  callCustomer: boolean;
 
   @ApiProperty({ type: [OrderProductDto] })
   @ValidateNested({ each: true })
