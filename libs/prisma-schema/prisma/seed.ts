@@ -144,46 +144,54 @@ async function seedCategories() {
   let i = 0;
   let j = 0;
   for (const category of filterCategoriesWithoutParent.parent) {
-    const parentCategory = await prisma.category.create({
-      data: {
-        name: category.name,
+    const isExistCategory = await prisma.category.findUnique({
+      where: {
         alias: transliteration(category.name),
-        description: "string",
-        keyCrmId: category.id,
-        imageUrl: "",
-        depth: 0,
-        pathname: {
-          set: [transliteration(category.name)],
-        },
       },
     });
-    console.log(i, ". create parent category: ", parentCategory);
-    const childCategoriesByParentId =
-      filterCategoriesWithoutParent.child.filter(
-        (child) => child.parent_id === category.id,
-      );
-    for (const childCategory of childCategoriesByParentId) {
-      const createCategory = await prisma.category.create({
+    if (!isExistCategory) {
+      const parentCategory = await prisma.category.create({
         data: {
-          name: childCategory.name,
-          alias: transliteration(childCategory.name),
+          name: category.name,
+          alias: transliteration(category.name),
           description: "string",
-          keyCrmId: childCategory.id,
+          keyCrmId: category.id,
           imageUrl: "",
-          parentCategoryId: parentCategory.id,
-          depth: 1,
+          depth: 0,
           pathname: {
-            set: [
-              ...parentCategory.pathname,
-              transliteration(childCategory.name),
-            ],
+            set: [transliteration(category.name)],
           },
         },
       });
-      console.log(j, ". create child category: ", createCategory);
-      j++;
+      console.log(i, ". create parent category: ", parentCategory);
+
+      const childCategoriesByParentId =
+        filterCategoriesWithoutParent.child.filter(
+          (child) => child.parent_id === category.id,
+        );
+      for (const childCategory of childCategoriesByParentId) {
+        const createCategory = await prisma.category.create({
+          data: {
+            name: childCategory.name,
+            alias: transliteration(childCategory.name),
+            description: "string",
+            keyCrmId: childCategory.id,
+            imageUrl: "",
+            parentCategoryId: parentCategory.id,
+            depth: 1,
+            pathname: {
+              set: [
+                ...parentCategory.pathname,
+                transliteration(childCategory.name),
+              ],
+            },
+          },
+        });
+        console.log(j, ". create child category: ", createCategory);
+        j++;
+      }
+      i++;
     }
-    i++;
   }
 }
 async function seedProducts() {
