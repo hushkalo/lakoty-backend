@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { CategoryDto } from "./category.dto";
 
 export class AllCategoriesResponseDto {
@@ -21,3 +21,8 @@ export class AllCategoriesResponseDto {
   })
   to: number;
 }
+
+export class CreateCategoryResponseDto extends OmitType(CategoryDto, [
+  "subCategories",
+  "_count",
+]) {}

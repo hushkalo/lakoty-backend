@@ -138,6 +138,14 @@ export class ErrorModel {
     error_code: "ORDER_ALREADY_CONFIRMED",
     message: "Order is already confirmed.",
   };
+  static readonly ORDER_NOT_FOUND = {
+    error_code: "ORDER_NOT_FOUND",
+    message: "Order not found.",
+  };
+  static readonly ORDER_BODY_UPDATE_ERROR = {
+    error_code: "ORDER_BODY_UPDATE_ERROR",
+    message: "Order body update error.",
+  };
   // Upload errors
   static readonly UPLOAD_FAILED = {
     error_code: "UPLOAD_FAILED",

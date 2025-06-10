@@ -17,7 +17,10 @@ import { JwtGuard } from "../guards/jwt.guard";
 import { User } from "../decorators/user.decorator";
 import { User as UserModel } from "@libs/prisma-client";
 import { ValidationPipe } from "../pipes/validation.pipe";
-import { AllProductsResponseDto } from "./dto/response.dto";
+import {
+  AllProductsResponseDto,
+  CreateProductResponseDto,
+} from "./dto/response.dto";
 import { ProductDto } from "./dto/product.dto";
 import {
   ApiTags,
@@ -25,7 +28,6 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
-  OmitType,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
@@ -47,12 +49,7 @@ export class ProductsController {
   @ApiOperation({ summary: "Create new product" })
   @ApiCreatedResponse({
     description: "Product successfully created",
-    type: OmitType(ProductDto, [
-      "_count",
-      "category",
-      "images",
-      "productSizes",
-    ]),
+    type: CreateProductResponseDto,
   })
   @ApiBadRequestResponse({
     description: "Bad Request",

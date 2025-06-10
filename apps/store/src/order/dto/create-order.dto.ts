@@ -205,6 +205,14 @@ export class CreateOrderDto {
   @IsBoolean()
   callCustomer: boolean;
 
+  @IsString()
+  @IsOptional()
+  @ApiProperty({
+    description: "Order comment",
+    example: "Please deliver by 5 PM",
+  })
+  comment: string;
+
   @ApiProperty({ type: [OrderProductDto] })
   @ValidateNested({ each: true })
   @Type(() => OrderProductDto)

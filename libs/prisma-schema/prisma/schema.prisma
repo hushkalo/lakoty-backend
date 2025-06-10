@@ -146,6 +146,7 @@ model Order {
   messengerType    String
   cityArea         String
   callCustomer     Boolean        @default(false)
+  comment          String?
   isDeleted        Boolean        @default(false)
   statusId         Int            @default(1)
   createdAt        DateTime       @default(now())

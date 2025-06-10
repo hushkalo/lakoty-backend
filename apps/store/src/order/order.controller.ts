@@ -139,7 +139,7 @@ export class OrderController {
   })
   @UsePipes(OrderValidationPipe)
   @Post()
-  create(@Body() body: CreateOrderDto) {
-    return this.orderService.create({ data: body });
+  create(@Body() body: CreateOrderDto): Promise<CreateOrderResponseDto> {
+    return this.orderService.createOrderInCrm({ data: body });
   }
 }

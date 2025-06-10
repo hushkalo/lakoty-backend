@@ -17,7 +17,7 @@ export class ProductImage {
   productId: string;
 }
 
-export class ProductSize {
+export class ProductSizeDto {
   @ApiProperty({ description: "Unique identifier", example: "size123" })
   id: string;
 
@@ -195,8 +195,8 @@ export class ProductDto {
   @ApiProperty({ description: "Product images", type: [ProductImage] })
   images: ProductImage[];
 
-  @ApiProperty({ description: "Product sizes", type: [ProductSize] })
-  productSizes: ProductSize[];
+  @ApiProperty({ description: "Product sizes", type: [ProductSizeDto] })
+  productSizes: ProductSizeDto[];
 
   @ApiProperty({ description: "Product category", type: Category })
   category: Category;

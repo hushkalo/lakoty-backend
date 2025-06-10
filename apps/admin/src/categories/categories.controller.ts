@@ -18,7 +18,10 @@ import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { JwtGuard } from "../guards/jwt.guard";
 import { Request } from "express";
 import { User } from "../decorators/user.decorator";
-import { AllCategoriesResponseDto } from "./dto/response.dto";
+import {
+  AllCategoriesResponseDto,
+  CreateCategoryResponseDto,
+} from "./dto/response.dto";
 import { CategoryDto } from "./dto/category.dto";
 import {
   ApiOperation,
@@ -31,7 +34,6 @@ import {
   ApiBody,
   ApiInternalServerErrorResponse,
   ApiBadRequestResponse,
-  OmitType,
   ApiConflictResponse,
 } from "@nestjs/swagger";
 import { AppError, AppErrorValidation, ErrorModel } from "@shared/error-model";
@@ -196,7 +198,7 @@ export class CategoriesController {
   @ApiResponse({
     status: 201,
     description: "Category created successfully",
-    type: OmitType(CategoryDto, ["subCategories", "_count"]),
+    type: CreateCategoryResponseDto,
   })
   @ApiInternalServerErrorResponse({
     description: "Internal server error",
@@ -268,7 +270,7 @@ export class CategoriesController {
   @ApiResponse({
     status: 200,
     description: "Category updated successfully",
-    type: OmitType(CategoryDto, ["subCategories", "_count"]),
+    type: CreateCategoryResponseDto,
   })
   @ApiConflictResponse({
     description: "Category already exists",
@@ -298,7 +300,7 @@ export class CategoriesController {
   @ApiResponse({
     status: 200,
     description: "Category deleted successfully",
-    type: OmitType(CategoryDto, ["subCategories", "_count"]),
+    type: CreateCategoryResponseDto,
   })
   @ApiNotFoundResponse({
     description: "Category not found",
