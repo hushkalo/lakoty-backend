@@ -93,17 +93,36 @@ export class OrderService {
   async createOrderInCrm(params: {
     data: CreateOrderDto;
   }): Promise<CreateOrderResponseDto> {
+    const { data } = params;
     const typeMessenger = {
       TELEGRAM: "Телеграм",
       VIBER: "Viber",
       WHATSAPP: "WhatsApp",
       INSTAGRAM: "Instagram",
     };
-    const { data } = params;
+    const messageMessenger =
+      data.messengerType !== "EMAIL"
+        ? `${typeMessenger[data.messengerType]}: ${data.messenger}`
+        : "";
+    const messagePayment =
+      data.paymentType === "PREPAY"
+        ? "Тип отплати: Передоплата"
+        : "Тип отплати: Оплата при отриманні";
+    const messageCall = data.callCustomer
+      ? "Телефонувати клієнту"
+      : "Не телефонувати клієнту";
+    const userComment = data.comment ? `Коментар клієнта: ${data.comment}` : "";
     const body = {
       source_id: 20,
       manager_id: 16,
-      buyer_comment: `${data.comment || ""}\n${data.messengerType !== "EMAIL" ? `${typeMessenger[data.messengerType]}: ${data.messenger}` : ""}\n Тип отплати: ${data.paymentType === "PREPAY" ? "Передоплата" : "Оплата при отриманні"}`,
+      buyer_comment: [
+        userComment,
+        messageMessenger,
+        messagePayment,
+        messageCall,
+      ]
+        .filter(Boolean)
+        .join("\n"),
       buyer: {
         full_name: `${data.firstName} ${data.secondName} ${data.patronymic}`,
         phone: data.phoneNumber,

@@ -76,6 +76,18 @@ export class ProductsController {
     type: String,
     description: "Filter by category alias",
   })
+  @ApiQuery({
+    name: "sale",
+    required: false,
+    type: Boolean,
+    description: "Filter products on sale",
+  })
+  @ApiQuery({
+    name: "novelty",
+    required: false,
+    type: Boolean,
+    description: "Filter products by novelty",
+  })
   @ApiResponse({
     status: 200,
     description: "List of products",
@@ -96,6 +108,8 @@ export class ProductsController {
     @Query("parentCategoryId") parentCategoryId?: string,
     @Query("alias") alias?: string,
     @Query("categoryAlias") categoryAlias?: string,
+    @Query("sale") sale?: boolean,
+    @Query("novelty") novelty?: boolean,
   ): Promise<ProductsResponseDto> {
     return this.productsService.findAll({
       take: Number(take) || undefined,
@@ -108,9 +122,13 @@ export class ProductsController {
         alias: alias ? alias : undefined,
         category: {
           id: categoryAlias ? undefined : categoryId,
-          alias: categoryAlias,
+          alias: categoryAlias || undefined,
           parentCategoryId: categoryAlias ? undefined : parentCategoryId,
         },
+        discount: sale ? { gt: 1 } : undefined,
+        createdAt: novelty
+          ? { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+          : undefined,
       },
       orderBy: [
         {
