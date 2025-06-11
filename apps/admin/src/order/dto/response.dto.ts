@@ -1,10 +1,12 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { OrderDto } from "./order.dto";
 
+class OrderDtoWithoutProducts extends OmitType(OrderDto, ["OrderProduct"]) {}
+
 export class OrdersResponseDto {
   @ApiProperty({
     description: "List of orders",
-    type: [OmitType(OrderDto, ["OrderProduct"])],
+    type: [OrderDtoWithoutProducts],
   })
   data: Omit<OrderDto, "OrderProduct">[];
   @ApiProperty({
