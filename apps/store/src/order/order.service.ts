@@ -135,7 +135,7 @@ export class OrderService {
           }),
         },
         redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout?status=success&orderId=${responseCreateOrder.data.id}`,
-        webHookUrl: `${this.configService.get("BASE_URL")}/callback`,
+        webHookUrl: `${this.configService.get("BASE_URL")}/api/orders/callback`,
         validity: 36000,
       };
       const responseCreateInvoice =
