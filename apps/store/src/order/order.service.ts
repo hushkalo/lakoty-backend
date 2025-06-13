@@ -135,7 +135,7 @@ export class OrderService {
           }),
         },
         redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout?status=success&orderId=${responseCreateOrder.data.id}`,
-        webHookUrl: "https://webhook.site/ffeaf671-ac73-4faf-82b5-f38ad8afb218",
+        webHookUrl: `${this.configService.get("BASE_URL")}/callback`,
         validity: 36000,
       };
       const responseCreateInvoice =
