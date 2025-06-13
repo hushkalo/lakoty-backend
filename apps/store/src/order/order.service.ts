@@ -174,86 +174,92 @@ export class OrderService {
   }
 
   async orderCallback(data: OrderCallbackCreateDto) {
-    const order = await this.prisma.order.findUnique({
-      where: {
-        keyCrmOrderId: Number(data.reference),
-      },
-    });
-    if (data.status === "created" || !order) return;
-    if (data.status === "processing") {
-      return this.prisma.order.update({
+    try {
+      console.log("Order callback data:", data);
+      const order = await this.prisma.order.findUnique({
         where: {
-          id: order.id,
-        },
-        data: {
-          status: "processing",
+          keyCrmOrderId: Number(data.reference),
         },
       });
-    }
-    if (data.status === "success") {
-      const orderFromCrm = await this.httpService.axiosRef.get<{
-        payments: {
-          id: number;
-        }[];
-      }>(`order/${order.keyCrmOrderId}?include=payments`, {
-        baseURL: this.configService.get("CRM_API_URL"),
-        headers: {
-          Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
-        },
-      });
-      await this.httpService.axiosRef.put(
-        `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
-        {
-          status: "paid",
-        },
-        {
+      if (data.status === "created" || !order) return;
+      if (data.status === "processing") {
+        return this.prisma.order.update({
+          where: {
+            id: order.id,
+          },
+          data: {
+            status: "processing",
+          },
+        });
+      }
+      if (data.status === "success") {
+        const orderFromCrm = await this.httpService.axiosRef.get<{
+          payments: {
+            id: number;
+          }[];
+        }>(`order/${order.keyCrmOrderId}?include=payments`, {
           baseURL: this.configService.get("CRM_API_URL"),
           headers: {
             Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
           },
-        },
-      );
-      return this.prisma.order.update({
-        where: {
-          id: order.id,
-        },
-        data: {
-          status: "success",
-        },
-      });
-    }
-    if (data.status === "failure") {
-      const orderFromCrm = await this.httpService.axiosRef.get<{
-        payments: {
-          id: number;
-        }[];
-      }>(`order/${order.keyCrmOrderId}?include=payments`, {
-        baseURL: this.configService.get("CRM_API_URL"),
-        headers: {
-          Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
-        },
-      });
-      await this.httpService.axiosRef.put(
-        `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
-        {
-          status: "canceled",
-        },
-        {
+        });
+        await this.httpService.axiosRef.put(
+          `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
+          {
+            status: "paid",
+          },
+          {
+            baseURL: this.configService.get("CRM_API_URL"),
+            headers: {
+              Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+            },
+          },
+        );
+        return this.prisma.order.update({
+          where: {
+            id: order.id,
+          },
+          data: {
+            status: "success",
+          },
+        });
+      }
+      if (data.status === "failure") {
+        const orderFromCrm = await this.httpService.axiosRef.get<{
+          payments: {
+            id: number;
+          }[];
+        }>(`order/${order.keyCrmOrderId}?include=payments`, {
           baseURL: this.configService.get("CRM_API_URL"),
           headers: {
             Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
           },
-        },
-      );
-      return this.prisma.order.update({
-        where: {
-          id: order.id,
-        },
-        data: {
-          status: "failure",
-        },
-      });
+        });
+        await this.httpService.axiosRef.put(
+          `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
+          {
+            status: "canceled",
+          },
+          {
+            baseURL: this.configService.get("CRM_API_URL"),
+            headers: {
+              Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+            },
+          },
+        );
+        return this.prisma.order.update({
+          where: {
+            id: order.id,
+          },
+          data: {
+            status: "failure",
+          },
+        });
+      }
+      return order;
+    } catch (e) {
+      console.error(e);
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
-    return order;
   }
 }
