@@ -47,10 +47,7 @@ async function bootstrap() {
   const origins: string[] = (await configService.get("CORS_ORIGIN")).split(",");
   app.enableCors({
     methods: ["GET", "POST"],
-    origin: (origin: string) => {
-      console.log(`CORS origin: ${origin}`);
-      return !origin || origins.includes(origin);
-    },
+    origin: origins,
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
