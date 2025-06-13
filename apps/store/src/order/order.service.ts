@@ -134,7 +134,7 @@ export class OrderService {
             };
           }),
         },
-        redirectUrl: `http://localhost:3000/checkout?status=success&orderId=${responseCreateOrder.data.id}`,
+        redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout?status=success&orderId=${responseCreateOrder.data.id}`,
         webHookUrl: "https://webhook.site/ffeaf671-ac73-4faf-82b5-f38ad8afb218",
         validity: 36000,
       };

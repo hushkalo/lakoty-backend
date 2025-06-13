@@ -88,6 +88,9 @@ export class EnvironmentVariablesForStore extends EnvironmentValidationShared {
 
   @IsString()
   MONOBANK_API_KEY: string;
+
+  @IsString()
+  CLIENT_URL: string;
 }
 
 export function validate(config: Record<string, unknown>) {
