@@ -7,9 +7,10 @@ import { WinstonModule } from "nest-winston";
 import { instance } from "@shared/logger";
 import { ConfigService } from "@nestjs/config";
 import { EnvironmentVariablesForStore } from "@shared/configuration";
+import { NestExpressApplication } from "@nestjs/platform-express";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: WinstonModule.createLogger({
       instance: instance,
     }),
@@ -50,6 +51,7 @@ async function bootstrap() {
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
+  app.set("query parser", "extended");
   await app.listen(configService.get("BASE_PORT"));
   instance.log({
     message: `Application is running on: ${await app.getUrl()} time: ${new Date(

@@ -4,26 +4,10 @@ import { OrderController } from "./order.controller";
 import { PrismaModule } from "@libs/prisma-client";
 import { ProductsModule } from "../products/products.module";
 import { HttpModule } from "@nestjs/axios";
-import { ConfigModule, ConfigService } from "@nestjs/config";
-import { EnvironmentVariablesForAdmin } from "@shared/configuration";
+import { ConfigModule } from "@nestjs/config";
 
 @Module({
-  imports: [
-    PrismaModule,
-    ProductsModule,
-    HttpModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (
-        configService: ConfigService<EnvironmentVariablesForAdmin>,
-      ) => ({
-        baseURL: configService.get("CRM_API_URL"),
-        headers: {
-          Authorization: `Bearer ${configService.get("CRM_API_KEY")}`,
-        },
-      }),
-    }),
-  ],
+  imports: [PrismaModule, ProductsModule, ConfigModule, HttpModule],
   controllers: [OrderController],
   providers: [OrderService, Logger],
   exports: [OrderService],

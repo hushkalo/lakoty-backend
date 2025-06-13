@@ -1,11 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma, PrismaService } from "@libs/prisma-client";
 import { ProductDto, RecommendationProductDto } from "./dto/product.dto";
-import { ProductsResponseDto } from "./dto/responses.dto";
+import {
+  ProductSizesResponseDto,
+  ProductsResponseDto,
+} from "./dto/responses.dto";
+import { CategoriesService } from "../categories/categories.service";
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly categoryService: CategoriesService,
+  ) {}
 
   async findAll(params: {
     skip?: number;
@@ -121,5 +128,54 @@ export class ProductsService {
       return null;
     }
     return product;
+  }
+
+  async getSizeByCategoryAlias(
+    categoryId?: string,
+  ): Promise<ProductSizesResponseDto> {
+    if (!categoryId) {
+      const sizes = await this.prisma.productSize.findMany({
+        where: {
+          isAvailable: true,
+        },
+        select: {
+          name: true,
+        },
+        distinct: ["name"],
+        orderBy: {
+          name: "asc",
+        },
+      });
+      return {
+        data: sizes.map((size) => size.name),
+      };
+    }
+    const categoryIds =
+      await this.categoryService.getAllSubCategoryIds(categoryId);
+
+    if (!categoryIds) {
+      return {
+        data: [],
+      };
+    }
+
+    const sizes = await this.prisma.productSize.findMany({
+      where: {
+        isAvailable: true,
+        Product: {
+          categoryId: {
+            in: categoryIds,
+          },
+        },
+      },
+      select: {
+        name: true,
+      },
+      distinct: ["name"],
+      orderBy: {
+        name: "asc",
+      },
+    });
+    return { data: sizes.map((size) => size.name) };
   }
 }

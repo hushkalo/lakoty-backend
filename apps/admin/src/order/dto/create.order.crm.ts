@@ -5,6 +5,15 @@ export class CreateOrderCrmDto {
   buyer: BuyerDto;
   shipping: ShippingDto;
   products: ProductDto[];
+  payments: PaymentDto[];
+}
+
+export class PaymentDto {
+  "payment_method_id": number;
+  "payment_method": string;
+  "amount": number;
+  "description": string;
+  "status": string;
 }
 
 export class BuyerDto {

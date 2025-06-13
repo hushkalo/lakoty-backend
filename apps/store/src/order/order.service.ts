@@ -3,97 +3,34 @@ import { CreateOrderDto } from "./dto/create-order.dto";
 import { HttpService } from "@nestjs/axios";
 import { ErrorModel } from "@shared/error-model";
 import { CreateOrderResponseDto } from "./dto/responses.dto";
+import { Prisma, PrismaService } from "@libs/prisma-client";
+import { EnvironmentVariablesForStore } from "@shared/configuration";
+import { ConfigService } from "@nestjs/config";
+import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private prisma: PrismaService,
+    private readonly configService: ConfigService<EnvironmentVariablesForStore>,
+  ) {}
 
-  // async create(params: { data: CreateOrderDto }) {
-  //   const { orderProducts, ...rest } = params.data;
-  //   const { productIds, sizeIds } = orderProducts.reduce(
-  //     (
-  //       acc: {
-  //         productIds: string[];
-  //         sizeIds: string[];
-  //       },
-  //       item,
-  //     ) => {
-  //       const productId = item.productId;
-  //       const productSizeId = item.size.id;
-  //       return {
-  //         productIds: [...acc.productIds, productId],
-  //         sizeIds: [...acc.sizeIds, productSizeId],
-  //       };
-  //     },
-  //     {
-  //       productIds: [],
-  //       sizeIds: [],
-  //     },
-  //   );
-  //   const findAllProduct = await this.productsService.findAll({
-  //     where: {
-  //       id: {
-  //         in: productIds,
-  //       },
-  //     },
-  //   });
-  //   if (findAllProduct.total !== productIds.length) {
-  //     const notFoundProduct = productIds.filter(
-  //       (item) => !findAllProduct.data.some((product) => product.id === item),
-  //     );
-  //     throw new BadRequestException(
-  //       ErrorModel.PRODUCT_DOES_NOT_EXIST + notFoundProduct.join(", "),
-  //     );
-  //   }
-  //   const findAllProductSize = await this.productsService.findAll({
-  //     where: {
-  //       productSizes: {
-  //         some: {
-  //           id: {
-  //             in: sizeIds,
-  //           },
-  //         },
-  //       },
-  //     },
-  //   });
-  //   if (findAllProductSize.total !== sizeIds.length) {
-  //     const notFoundProductSize = sizeIds.filter(
-  //       (item) =>
-  //         !findAllProductSize.data.some((product) =>
-  //           product.productSizes.some((size) => size.id === item),
-  //         ),
-  //     );
-  //     throw new BadRequestException(
-  //       ErrorModel.PRODUCT_SIZE_NOT_FOUND + notFoundProductSize.join(", "),
-  //     );
-  //   }
-  //   return this.prisma.order.create({
-  //     data: {
-  //       ...rest,
-  //       Status: {
-  //         connect: {
-  //           id: 1,
-  //         },
-  //       },
-  //       OrderProduct: {
-  //         createMany: {
-  //           data: orderProducts.map((item) => ({
-  //             productId: item.productId,
-  //             quantity: item.quantity,
-  //             price: item.price,
-  //             discount: item.discount,
-  //             sizeId: item.size.name === "base" ? undefined : item.size.id,
-  //           })),
-  //         },
-  //       },
-  //     },
-  //   });
-  // }
+  async create(data: Prisma.OrderCreateInput) {
+    return this.prisma.order.create({ data });
+  }
 
   async createOrderInCrm(params: {
     data: CreateOrderDto;
   }): Promise<CreateOrderResponseDto> {
     const { data } = params;
+    const totalSum = data.orderProducts.reduce(
+      (acc, item) =>
+        acc +
+        Math.round(item.price - (item.price * item.discount) / 100) *
+          item.quantity,
+      0,
+    );
     const typeMessenger = {
       TELEGRAM: "Телеграм",
       VIBER: "Viber",
@@ -112,7 +49,7 @@ export class OrderService {
       ? "Телефонувати клієнту"
       : "Не телефонувати клієнту";
     const userComment = data.comment ? `Коментар клієнта: ${data.comment}` : "";
-    const body = {
+    const bodyOrder = {
       source_id: 20,
       manager_id: 16,
       buyer_comment: [
@@ -155,13 +92,168 @@ export class OrderService {
           },
         ],
       })),
+      payments: [
+        {
+          payment_method_id: 27,
+          payment_method:
+            data.paymentType === "PREPAY"
+              ? "Передоплата"
+              : "Оплата при отриманні",
+          amount: data.paymentType === "PREPAY" ? totalSum : 200,
+          description: "",
+          status: "not_paid",
+        },
+      ],
     };
     try {
-      await this.httpService.axiosRef.post("/order", body);
-      return { message: "Order created successfully." };
+      const responseCreateOrder = await this.httpService.axiosRef.post<{
+        id: number;
+      }>("/order", bodyOrder, {
+        baseURL: this.configService.get("CRM_API_URL"),
+        headers: {
+          Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        },
+      });
+      const bodyInvoice = {
+        amount: totalSum * 100,
+        ccy: 980,
+        merchantPaymInfo: {
+          reference: responseCreateOrder.data.id.toString(),
+          destination: "Lakotiy Store",
+          customerEmails: ["ushkalo.herman@gmail.com"],
+          basketOrder: data.orderProducts.map((item) => {
+            const priceWithDiscount =
+              Math.round(item.price - (item.price * item.discount) / 100) * 100;
+            return {
+              name: item.name,
+              qty: item.quantity,
+              sum: priceWithDiscount,
+              total: priceWithDiscount * item.quantity,
+              icon: item.image,
+              unit: "шт.",
+            };
+          }),
+        },
+        redirectUrl: `http://localhost:3000/checkout?status=success&orderId=${responseCreateOrder.data.id}`,
+        webHookUrl: "https://webhook.site/ffeaf671-ac73-4faf-82b5-f38ad8afb218",
+        validity: 36000,
+      };
+      const responseCreateInvoice =
+        data.paymentType === "PREPAY"
+          ? await this.httpService.axiosRef.post<{
+              invoiceId: string;
+              pageUrl: string;
+            }>("/merchant/invoice/create", bodyInvoice, {
+              baseURL: this.configService.get("MONOBANK_API_URL"),
+              headers: {
+                "X-Token": this.configService.get("MONOBANK_API_KEY"),
+              },
+            })
+          : undefined;
+      await this.create({
+        firstName: data.firstName,
+        secondName: data.secondName,
+        patronymic: data.patronymic,
+        phoneNumber: data.phoneNumber,
+        paymentType: data.paymentType,
+        messengerType: data.messengerType,
+        callCustomer: data.callCustomer,
+        comment: data.comment,
+        keyCrmOrderId: responseCreateOrder.data.id,
+        invoiceId: responseCreateInvoice.data.invoiceId,
+        status: "created",
+      });
+      return {
+        message: "Order created successfully.",
+        paymentPageUrl: responseCreateInvoice.data.pageUrl,
+      };
     } catch (e) {
-      console.error("Error creating order in CRM:", e);
+      console.error(e);
       throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  async orderCallback(data: OrderCallbackCreateDto) {
+    const order = await this.prisma.order.findUnique({
+      where: {
+        keyCrmOrderId: Number(data.reference),
+      },
+    });
+    if (data.status === "created" || !order) return;
+    if (data.status === "processing") {
+      return this.prisma.order.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          status: "processing",
+        },
+      });
+    }
+    if (data.status === "success") {
+      const orderFromCrm = await this.httpService.axiosRef.get<{
+        payments: {
+          id: number;
+        }[];
+      }>(`order/${order.keyCrmOrderId}?include=payments`, {
+        baseURL: this.configService.get("CRM_API_URL"),
+        headers: {
+          Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        },
+      });
+      await this.httpService.axiosRef.put(
+        `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
+        {
+          status: "paid",
+        },
+        {
+          baseURL: this.configService.get("CRM_API_URL"),
+          headers: {
+            Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+          },
+        },
+      );
+      return this.prisma.order.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          status: "success",
+        },
+      });
+    }
+    if (data.status === "failure") {
+      const orderFromCrm = await this.httpService.axiosRef.get<{
+        payments: {
+          id: number;
+        }[];
+      }>(`order/${order.keyCrmOrderId}?include=payments`, {
+        baseURL: this.configService.get("CRM_API_URL"),
+        headers: {
+          Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        },
+      });
+      await this.httpService.axiosRef.put(
+        `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
+        {
+          status: "canceled",
+        },
+        {
+          baseURL: this.configService.get("CRM_API_URL"),
+          headers: {
+            Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+          },
+        },
+      );
+      return this.prisma.order.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          status: "failure",
+        },
+      });
+    }
+    return order;
   }
 }

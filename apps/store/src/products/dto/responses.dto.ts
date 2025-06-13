@@ -28,3 +28,11 @@ export class ProductWithRecommendationResponseDto extends ProductDto {
   })
   recommendations: RecommendationProductDto[];
 }
+export class ProductSizesResponseDto {
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: "Product sizes.",
+  })
+  data: string[];
+}

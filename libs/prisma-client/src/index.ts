@@ -11,7 +11,6 @@ export {
   ProductSize,
   Category,
   OrderProduct,
-  OrderStatus,
   ServerStatus,
   Role,
 } from "./generated/client";

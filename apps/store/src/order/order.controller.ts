@@ -12,6 +12,7 @@ import { CreateOrderResponseDto } from "./dto/responses.dto";
 import { OrderValidationPipe } from "../pipes/order-validation.pipe";
 import { AppError, ErrorModel } from "@shared/error-model";
 import { CreateOrderDto } from "./dto/create-order.dto";
+import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
 
 @ApiTags("Orders")
 @Controller("orders")
@@ -141,5 +142,10 @@ export class OrderController {
   @Post()
   create(@Body() body: CreateOrderDto): Promise<CreateOrderResponseDto> {
     return this.orderService.createOrderInCrm({ data: body });
+  }
+
+  @Post("callback")
+  callback(@Body() body: OrderCallbackCreateDto) {
+    return this.orderService.orderCallback(body);
   }
 }

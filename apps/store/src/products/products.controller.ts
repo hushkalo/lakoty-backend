@@ -9,6 +9,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import {
+  ProductSizesResponseDto,
   ProductsResponseDto,
   ProductWithRecommendationResponseDto,
 } from "./dto/responses.dto";
@@ -88,6 +89,30 @@ export class ProductsController {
     type: Boolean,
     description: "Filter products by novelty",
   })
+  @ApiQuery({
+    name: "filter[size_name]",
+    required: false,
+    type: String,
+    description: "Filter products by size name",
+  })
+  @ApiQuery({
+    name: "filter[category_id]",
+    required: false,
+    type: String,
+    description: "Filter products by category id",
+  })
+  @ApiQuery({
+    name: "filter[min_price]",
+    required: false,
+    type: String,
+    description: "Filter products by minimum price",
+  })
+  @ApiQuery({
+    name: "filter[max_price]",
+    required: false,
+    type: String,
+    description: "Filter products by maximum price",
+  })
   @ApiResponse({
     status: 200,
     description: "List of products",
@@ -110,7 +135,15 @@ export class ProductsController {
     @Query("categoryAlias") categoryAlias?: string,
     @Query("sale") sale?: boolean,
     @Query("novelty") novelty?: boolean,
+    @Query("filter")
+    filter?: {
+      size_name?: string;
+      category_id?: string;
+      min_price?: number;
+      max_price?: number;
+    },
   ): Promise<ProductsResponseDto> {
+    console.log(filter);
     return this.productsService.findAll({
       take: Number(take) || undefined,
       skip: Number(skip) || undefined,
@@ -119,9 +152,29 @@ export class ProductsController {
           contains: searchString,
           mode: "insensitive",
         },
+        productSizes: filter?.size_name && {
+          some: {
+            name: {
+              in: filter.size_name.split(","),
+            },
+          },
+        },
+        price: filter?.min_price &&
+          filter?.max_price && {
+            gte: filter?.min_price ? +filter.min_price : undefined,
+            lte: filter?.max_price ? +filter.max_price : undefined,
+          },
         alias: alias ? alias : undefined,
         category: {
-          id: categoryAlias ? undefined : categoryId,
+          id: categoryAlias
+            ? undefined
+            : categoryId || filter?.category_id
+              ? {
+                  in: [categoryId, filter?.category_id?.split(",")]
+                    .filter(Boolean)
+                    .flat(),
+                }
+              : undefined,
           alias: categoryAlias || undefined,
           parentCategoryId: categoryAlias ? undefined : parentCategoryId,
         },
@@ -202,5 +255,28 @@ export class ProductsController {
       ...product,
       recommendations,
     };
+  }
+
+  @Get("sizes/all")
+  @ApiOperation({ summary: "Get product sizes by category id" })
+  @ApiQuery({
+    name: "categoryId",
+    required: false,
+    description: "Category id",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Product sizes.",
+    type: ProductSizesResponseDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: "Internal server error",
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
+  })
+  getSizeByCategoryId(
+    @Query("categoryId") categoryId?: string,
+  ): Promise<ProductSizesResponseDto> {
+    return this.productsService.getSizeByCategoryAlias(categoryId);
   }
 }

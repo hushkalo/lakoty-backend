@@ -19,4 +19,6 @@ export const configuration = () => ({
   DATABASE_URL: process.env["DATABASE_URL"],
   NOVA_POST_API_URL: process.env["NOVA_POST_API_URL"],
   NOVA_POST_API_KEY: process.env["NOVA_POST_API_KEY"],
+  MONOBANK_API_URL: process.env["MONOBANK_API_URL"],
+  MONOBANK_API_KEY: process.env["MONOBANK_API_KEY"],
 });

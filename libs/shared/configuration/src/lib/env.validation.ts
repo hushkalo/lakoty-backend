@@ -82,7 +82,13 @@ export class EnvironmentVariablesForAdmin extends EnvironmentValidationShared {
   JWT_REFRESH_TOKEN_EXPIRES_IN: string;
 }
 
-export class EnvironmentVariablesForStore extends EnvironmentValidationShared {}
+export class EnvironmentVariablesForStore extends EnvironmentValidationShared {
+  @IsString()
+  MONOBANK_API_URL: string;
+
+  @IsString()
+  MONOBANK_API_KEY: string;
+}
 
 export function validate(config: Record<string, unknown>) {
   if (config["TYPE_REPO"] === undefined) {

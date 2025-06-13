@@ -144,11 +144,30 @@ export class CategoriesController {
     });
   }
 
+  @ApiOperation({ summary: "Get a category tree by ID" })
+  @ApiParam({ name: "id", required: true, description: "Category ID" })
+  @ApiQuery({
+    name: "flat",
+    required: false,
+    type: String,
+    description: "Return flat structure instead of tree (true/false)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Category tree by ID.",
+    type: TreeCategoryDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: "Internal server error",
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
+  })
   @Get("tree/:id")
   getTreeCategoryById(
     @Param("id") id: string,
-  ): Promise<TreeCategoryDto | null> {
-    return this.categoryService.getTreeCategoriesById(id);
+    @Query("flat") flat: string,
+  ): Promise<TreeCategoryDto | TreeCategoryDto[] | null> {
+    return this.categoryService.getTreeCategoriesById(id, flat === "true");
   }
 
   @Get(":id")

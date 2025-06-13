@@ -117,7 +117,8 @@ export class CategoriesService {
 
   async getTreeCategoriesById(
     categoryId: string,
-  ): Promise<TreeCategoryDto | null> {
+    flat = false,
+  ): Promise<TreeCategoryDto | TreeCategoryDto[] | null> {
     const treeCategories = await this.getTreeCategories({
       isFlat: true,
       categoryId,
@@ -125,28 +126,49 @@ export class CategoriesService {
     if (!treeCategories) {
       return null;
     }
-    function buildCategoryAncestryTree(
+
+    function buildCategorySubTree(
       categories: TreeCategoryDto[],
       targetId: string,
-    ) {
+    ): TreeCategoryDto | null {
       const categoryMap = new Map<string, TreeCategoryDto>(
         categories.map((cat) => [cat.id, { ...cat, children: [] }]),
       );
 
-      let current = categoryMap.get(targetId);
-      if (!current) return null;
+      const targetCategory = categoryMap.get(targetId);
+      if (!targetCategory) return null;
 
-      while (current.parentCategoryId) {
-        const parent = categoryMap.get(current.parentCategoryId);
-        if (!parent) break;
-
-        parent.children = [current];
-        current = parent;
+      for (const category of categories) {
+        if (category.parentCategoryId) {
+          const parent = categoryMap.get(category.parentCategoryId);
+          const currentCategory = categoryMap.get(category.id);
+          if (parent && currentCategory) {
+            parent.children.push(currentCategory);
+          }
+        }
       }
 
-      return current; // корень поддерева
+      return targetCategory;
     }
-    return buildCategoryAncestryTree(treeCategories, categoryId);
+
+    function flattenCategoryTree(category: TreeCategoryDto): TreeCategoryDto[] {
+      const result: TreeCategoryDto[] = [{ ...category, children: [] }];
+      for (const child of category.children) {
+        result.push(...flattenCategoryTree(child));
+      }
+      return result;
+    }
+
+    const subTree = buildCategorySubTree(treeCategories, categoryId);
+    if (!subTree) return null;
+
+    // Если flat === true, возвращаем плоский список
+    if (flat) {
+      return flattenCategoryTree(subTree);
+    }
+
+    // Иначе возвращаем поддерево
+    return subTree;
   }
 
   async getTreeCategories(params: {
@@ -220,5 +242,43 @@ export class CategoriesService {
     }
 
     return buildCategoryTree(data, maxDepth);
+  }
+
+  async getAllSubCategoryIds(categoryId: string): Promise<string[]> {
+    const rootCategory = await this.prisma.category.findUnique({
+      where: {
+        id: categoryId,
+        isDeleted: false,
+        hidden: false,
+      },
+      select: { id: true },
+    });
+
+    if (!rootCategory) {
+      return [];
+    }
+
+    // Рекурсивно собираем ID подкатегорий
+    const categoryIds: string[] = [rootCategory.id];
+    const stack: string[] = [rootCategory.id];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop();
+      const subCategories = await this.prisma.category.findMany({
+        where: {
+          parentCategoryId: currentId,
+          isDeleted: false,
+          hidden: false,
+        },
+        select: { id: true },
+      });
+
+      for (const subCat of subCategories) {
+        categoryIds.push(subCat.id);
+        stack.push(subCat.id);
+      }
+    }
+
+    return categoryIds;
   }
 }
