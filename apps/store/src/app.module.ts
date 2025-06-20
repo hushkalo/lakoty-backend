@@ -7,6 +7,7 @@ import { validate, configuration } from "@shared/configuration";
 import { OrderModule } from "./order/order.module";
 import { NovaPostModule } from "./nova-post/nova-post.module";
 import { CourseModule } from "./course/course.module";
+import { RedisModule } from "./redis/redis.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CourseModule } from "./course/course.module";
       expandVariables: true,
       validate,
     }),
+    RedisModule.forRoot(),
   ],
   providers: [],
 })

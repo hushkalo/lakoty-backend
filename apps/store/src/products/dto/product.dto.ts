@@ -1,7 +1,7 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { CategoryDto } from "../../categories/dto/category.dto";
 
-class ProductImageDto {
+export class ProductImageDto {
   @ApiProperty({
     description: "URL of the product image",
     example: "https://example.com/image.jpg",

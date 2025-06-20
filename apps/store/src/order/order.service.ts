@@ -2,11 +2,17 @@ import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { HttpService } from "@nestjs/axios";
 import { ErrorModel } from "@shared/error-model";
-import { CreateOrderResponseDto } from "./dto/responses.dto";
+import {
+  CreateOrderResponseDto,
+  RetryOrderResponseDto,
+} from "./dto/responses.dto";
 import { Prisma, PrismaService } from "@libs/prisma-client";
 import { EnvironmentVariablesForStore } from "@shared/configuration";
 import { ConfigService } from "@nestjs/config";
 import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
+import { OrderDto, OrderProductDto } from "./dto/order.dto";
+import { CreateOrderCrmDto } from "./dto/create.order.crm.dto";
+import { AxiosResponse } from "axios";
 
 @Injectable()
 export class OrderService {
@@ -16,14 +22,160 @@ export class OrderService {
     private readonly configService: ConfigService<EnvironmentVariablesForStore>,
   ) {}
 
-  async create(data: Prisma.OrderCreateInput) {
-    return this.prisma.order.create({ data });
-  }
-
-  async createOrderInCrm(params: {
+  async create(params: {
     data: CreateOrderDto;
   }): Promise<CreateOrderResponseDto> {
     const { data } = params;
+    try {
+      const orderFromCrm = await this.createOrderInCrm(data);
+      const newOrder = await this.prisma.order.create({
+        data: {
+          firstName: data.firstName,
+          secondName: data.secondName,
+          patronymic: data.patronymic,
+          phoneNumber: data.phoneNumber,
+          paymentType: data.paymentType,
+          messengerType: data.messengerType,
+          callCustomer: data.callCustomer,
+          comment: data.comment,
+          keyCrmOrderId: orderFromCrm.id,
+          status: "created",
+          city: data.city,
+          warehouseAddress: data.warehouseAddress,
+          warehouseNumber: data.warehouseNumber,
+          warehouseType: data.warehouseType,
+          OrderProduct: {
+            createMany: {
+              data: data.orderProducts.map((item) => ({
+                discount: item.discount,
+                price: item.price,
+                productId: item.productId,
+                quantity: item.quantity,
+                sizeId: item.size?.id,
+              })),
+            },
+          },
+        },
+        include: {
+          OrderProduct: {
+            include: {
+              Product: {
+                select: {
+                  name: true,
+                  alias: true,
+                  images: true,
+                },
+              },
+              ProductSize: true,
+            },
+          },
+        },
+      });
+      const invoice =
+        data.paymentType === "PREPAY"
+          ? await this.createInvoice({
+              data: newOrder.OrderProduct,
+              orderId: newOrder.id,
+              crmOrderId: orderFromCrm.id.toString(),
+            })
+          : undefined;
+      await this.update(newOrder.id, {
+        invoiceId: invoice?.invoiceId,
+      });
+      return {
+        message: "Order created successfully.",
+        paymentPageUrl: invoice?.pageUrl,
+        orderId: newOrder.id,
+      };
+    } catch (e) {
+      console.error(e);
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  update(
+    orderId: string,
+    data: Prisma.OrderUpdateInput,
+  ): Promise<Omit<OrderDto, "OrderProduct">> {
+    return this.prisma.order.update({ where: { id: orderId }, data });
+  }
+
+  async retryPayment(orderId: string): Promise<RetryOrderResponseDto> {
+    const order = await this.findOne({
+      where: {
+        id: orderId,
+      },
+    });
+    if (!order) {
+      return null;
+    }
+    const totalSum = order.OrderProduct.reduce(
+      (acc, item) =>
+        acc +
+        Math.round(item.price - (item.price * item.discount) / 100) *
+          item.quantity,
+      0,
+    );
+    const orderFromCrm = await this.getOrderFromCrm(order.keyCrmOrderId);
+    const notPaidPayment = orderFromCrm.payments.find((item) => {
+      console.log(item.amount, totalSum);
+      return item.status !== "canceled" && item.amount === totalSum;
+    });
+    if (!notPaidPayment) {
+      await this.createCrmOrderPayment(
+        order.keyCrmOrderId.toString(),
+        totalSum,
+        "not_paid",
+      );
+    }
+    const newInvoice = await this.createInvoice({
+      data: order.OrderProduct,
+      orderId: order.id,
+      crmOrderId: order.keyCrmOrderId.toString(),
+    });
+    await this.update(order.id, {
+      invoiceId: newInvoice.invoiceId,
+      status: "retry",
+    });
+    return {
+      message: "Invoice has been created",
+      paymentPageUrl: newInvoice.pageUrl,
+    };
+  }
+
+  async findOne(params: {
+    where: Prisma.OrderWhereUniqueInput;
+  }): Promise<OrderDto | null> {
+    const order = await this.prisma.order.findUnique({
+      ...params,
+      include: {
+        OrderProduct: {
+          include: {
+            Product: {
+              select: {
+                name: true,
+                alias: true,
+                images: true,
+              },
+            },
+            ProductSize: true,
+          },
+        },
+      },
+    });
+    if (!order) {
+      return null;
+    }
+    return order;
+  }
+
+  private async createOrderInCrm(data: CreateOrderDto) {
+    const typeMessenger = {
+      TELEGRAM: "Телеграм",
+      VIBER: "Viber",
+      WHATSAPP: "WhatsApp",
+      INSTAGRAM: "Instagram",
+    };
     const totalSum = data.orderProducts.reduce(
       (acc, item) =>
         acc +
@@ -31,12 +183,6 @@ export class OrderService {
           item.quantity,
       0,
     );
-    const typeMessenger = {
-      TELEGRAM: "Телеграм",
-      VIBER: "Viber",
-      WHATSAPP: "WhatsApp",
-      INSTAGRAM: "Instagram",
-    };
     const messageMessenger =
       data.messengerType !== "EMAIL"
         ? `${typeMessenger[data.messengerType]}: ${data.messenger}`
@@ -82,13 +228,13 @@ export class OrderService {
         discount_percent: item.discount,
         discount_amount: Math.round((item.price * item.discount) / 100),
         quantity: item.quantity,
-        unit_type: "шт.",
+        unit_type: "од.",
         name: item.name,
         picture: item.image,
         properties: [
           {
             name: "Розмір",
-            value: item.size.name,
+            value: item?.size?.name || "Базовий",
           },
         ],
       })),
@@ -105,72 +251,110 @@ export class OrderService {
         },
       ],
     };
-    try {
-      const responseCreateOrder = await this.httpService.axiosRef.post<{
+    const response = await this.httpService.axiosRef.post<
+      unknown,
+      AxiosResponse<{
         id: number;
-      }>("/order", bodyOrder, {
+      }>,
+      CreateOrderCrmDto
+    >("/order", bodyOrder, {
+      baseURL: this.configService.get("CRM_API_URL"),
+      headers: {
+        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+      },
+    });
+    return response.data;
+  }
+
+  private async createCrmOrderPayment(
+    crmOrderId: string,
+    amount: number,
+    status: "not_paid" | "paid",
+  ): Promise<void> {
+    await this.httpService.axiosRef.post(
+      `/order/${crmOrderId}/payment`,
+      {
+        payment_method_id: 27,
+        payment_method: "Передоплата",
+        amount,
+        description: "",
+        status,
+      },
+      {
         baseURL: this.configService.get("CRM_API_URL"),
         headers: {
           Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
         },
-      });
-      const bodyInvoice = {
-        amount: totalSum * 100,
-        ccy: 980,
-        merchantPaymInfo: {
-          reference: responseCreateOrder.data.id.toString(),
-          destination: "Lakotiy Store",
-          customerEmails: ["ushkalo.herman@gmail.com"],
-          basketOrder: data.orderProducts.map((item) => {
-            const priceWithDiscount =
-              Math.round(item.price - (item.price * item.discount) / 100) * 100;
-            return {
-              name: item.name,
-              qty: item.quantity,
-              sum: priceWithDiscount,
-              total: priceWithDiscount * item.quantity,
-              icon: item.image,
-              unit: "шт.",
-            };
-          }),
-        },
-        redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout?status=success&orderId=${responseCreateOrder.data.id}`,
-        webHookUrl: `${this.configService.get("BASE_URL")}/api/orders/callback`,
-        validity: 36000,
-      };
-      const responseCreateInvoice =
-        data.paymentType === "PREPAY"
-          ? await this.httpService.axiosRef.post<{
-              invoiceId: string;
-              pageUrl: string;
-            }>("/merchant/invoice/create", bodyInvoice, {
-              baseURL: this.configService.get("MONOBANK_API_URL"),
-              headers: {
-                "X-Token": this.configService.get("MONOBANK_API_KEY"),
-              },
-            })
-          : undefined;
-      await this.create({
-        firstName: data.firstName,
-        secondName: data.secondName,
-        patronymic: data.patronymic,
-        phoneNumber: data.phoneNumber,
-        paymentType: data.paymentType,
-        messengerType: data.messengerType,
-        callCustomer: data.callCustomer,
-        comment: data.comment,
-        keyCrmOrderId: responseCreateOrder.data.id,
-        invoiceId: responseCreateInvoice.data.invoiceId,
-        status: "created",
-      });
-      return {
-        message: "Order created successfully.",
-        paymentPageUrl: responseCreateInvoice.data.pageUrl,
-      };
-    } catch (e) {
-      console.error(e);
-      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
-    }
+      },
+    );
+    return;
+  }
+
+  private async createInvoice(params: {
+    data: OrderProductDto[];
+    orderId: string;
+    crmOrderId: string;
+  }) {
+    const { data, crmOrderId, orderId } = params;
+    const totalSum = data.reduce(
+      (acc, item) =>
+        acc +
+        Math.round(item.price - (item.price * item.discount) / 100) *
+          item.quantity,
+      0,
+    );
+    const bodyInvoice = {
+      amount: totalSum * 100,
+      ccy: 980,
+      merchantPaymInfo: {
+        reference: crmOrderId,
+        destination: "Lakotiy Store",
+        customerEmails: ["ushkalo.herman@gmail.com"],
+        basketOrder: data.map((item) => {
+          const priceWithDiscount =
+            Math.round(item.price - (item.price * item.discount) / 100) * 100;
+          return {
+            name: `${item.Product.name} (${item.ProductSize?.name || "base"})`,
+            qty: item.quantity,
+            sum: priceWithDiscount,
+            total: priceWithDiscount * item.quantity,
+            icon: item.Product.images[0].url,
+            unit: "шт.",
+          };
+        }),
+      },
+      redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout/status?&orderId=${orderId}`,
+      // webHookUrl: `${this.configService.get("BASE_URL")}/api/orders/callback`,
+      webHookUrl: "https://webhook.site/8a249e3a-51f3-4840-8958-f31ec0ad38ac",
+      validity: 36000,
+    };
+    const response = await this.httpService.axiosRef.post<{
+      invoiceId: string;
+      pageUrl: string;
+    }>("/merchant/invoice/create", bodyInvoice, {
+      baseURL: this.configService.get("MONOBANK_API_URL"),
+      headers: {
+        "X-Token": this.configService.get("MONOBANK_API_KEY"),
+      },
+    });
+    return response.data;
+  }
+
+  private async getOrderFromCrm(crmOrderId: number) {
+    const orderFromCrm = await this.httpService.axiosRef.get<{
+      id: number;
+      payments: {
+        id: number;
+        status: string;
+        amount: number;
+      }[];
+    }>(`order/${crmOrderId}?include=payments`, {
+      baseURL: this.configService.get("CRM_API_URL"),
+      headers: {
+        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+      },
+    });
+    return orderFromCrm.data;
   }
 
   async orderCallback(data: OrderCallbackCreateDto) {
@@ -181,7 +365,14 @@ export class OrderService {
           keyCrmOrderId: Number(data.reference),
         },
       });
-      if (data.status === "created" || !order) return;
+      if (
+        data.status === "created" ||
+        !order ||
+        order.status === "failure" ||
+        order.status === "success"
+      )
+        return;
+
       if (data.status === "processing") {
         return this.prisma.order.update({
           where: {
@@ -192,29 +383,32 @@ export class OrderService {
           },
         });
       }
+      const orderFromCrm = await this.getOrderFromCrm(order.keyCrmOrderId);
+      const notPaidPayment = orderFromCrm.payments.find(
+        (item) =>
+          item.status !== "canceled" && item.amount === data.amount / 100,
+      );
       if (data.status === "success") {
-        const orderFromCrm = await this.httpService.axiosRef.get<{
-          payments: {
-            id: number;
-          }[];
-        }>(`order/${order.keyCrmOrderId}?include=payments`, {
-          baseURL: this.configService.get("CRM_API_URL"),
-          headers: {
-            Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
-          },
-        });
-        await this.httpService.axiosRef.put(
-          `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
-          {
-            status: "paid",
-          },
-          {
-            baseURL: this.configService.get("CRM_API_URL"),
-            headers: {
-              Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        if (notPaidPayment) {
+          await this.httpService.axiosRef.put(
+            `order/${order.keyCrmOrderId}/payment/${notPaidPayment.id}`,
+            {
+              status: "paid",
             },
-          },
-        );
+            {
+              baseURL: this.configService.get("CRM_API_URL"),
+              headers: {
+                Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+              },
+            },
+          );
+        } else {
+          await this.createCrmOrderPayment(
+            orderFromCrm.id.toString(),
+            data.amount / 100,
+            "paid",
+          );
+        }
         return this.prisma.order.update({
           where: {
             id: order.id,
@@ -225,18 +419,8 @@ export class OrderService {
         });
       }
       if (data.status === "failure") {
-        const orderFromCrm = await this.httpService.axiosRef.get<{
-          payments: {
-            id: number;
-          }[];
-        }>(`order/${order.keyCrmOrderId}?include=payments`, {
-          baseURL: this.configService.get("CRM_API_URL"),
-          headers: {
-            Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
-          },
-        });
         await this.httpService.axiosRef.put(
-          `order/${order.keyCrmOrderId}/payment/${orderFromCrm.data.payments[0].id}`,
+          `order/${order.keyCrmOrderId}/payment/${notPaidPayment.id}`,
           {
             status: "canceled",
           },

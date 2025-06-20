@@ -22,4 +22,6 @@ export const configuration = () => ({
   MONOBANK_API_URL: process.env["MONOBANK_API_URL"],
   MONOBANK_API_KEY: process.env["MONOBANK_API_KEY"],
   CLIENT_URL: process.env["CLIENT_URL"],
+  REDIS_HOST: process.env["REDIS_HOST"],
+  REDIS_PORT: process.env["REDIS_PORT"],
 });

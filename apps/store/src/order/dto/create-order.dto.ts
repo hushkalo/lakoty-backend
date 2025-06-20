@@ -47,7 +47,7 @@ class CreateOrderProductSizeDto {
   name: string;
 }
 
-class OrderProductDto {
+class CreateOrderProductDto {
   @ApiProperty({
     description: "Product ID",
     example: "clhlw1mlq0000ksvm3gfy3eur",
@@ -213,9 +213,9 @@ export class CreateOrderDto {
   })
   comment: string;
 
-  @ApiProperty({ type: [OrderProductDto] })
+  @ApiProperty({ type: [CreateOrderProductDto] })
   @ValidateNested({ each: true })
-  @Type(() => OrderProductDto)
+  @Type(() => CreateOrderProductDto)
   @ArrayNotEmpty()
-  orderProducts: OrderProductDto[];
+  orderProducts: CreateOrderProductDto[];
 }

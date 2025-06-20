@@ -91,6 +91,12 @@ export class EnvironmentVariablesForStore extends EnvironmentValidationShared {
 
   @IsString()
   CLIENT_URL: string;
+
+  @IsString()
+  REDIS_HOST: string;
+
+  @IsNumber()
+  REDIS_PORT: number;
 }
 
 export function validate(config: Record<string, unknown>) {

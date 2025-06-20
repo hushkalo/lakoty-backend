@@ -1,14 +1,19 @@
-import { Controller, Post, Body, UsePipes } from "@nestjs/common";
+import { Controller, Post, Body, UsePipes, Param, Get } from "@nestjs/common";
 import { OrderService } from "./order.service";
 import {
   ApiBadRequestResponse,
   ApiBody,
   ApiInternalServerErrorResponse,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
-import { CreateOrderResponseDto } from "./dto/responses.dto";
+import {
+  CreateOrderResponseDto,
+  OrderResponseDto,
+  RetryOrderResponseDto,
+} from "./dto/responses.dto";
 import { OrderValidationPipe } from "../pipes/order-validation.pipe";
 import { AppError, ErrorModel } from "@shared/error-model";
 import { CreateOrderDto } from "./dto/create-order.dto";
@@ -141,7 +146,58 @@ export class OrderController {
   @UsePipes(OrderValidationPipe)
   @Post()
   create(@Body() body: CreateOrderDto): Promise<CreateOrderResponseDto> {
-    return this.orderService.createOrderInCrm({ data: body });
+    return this.orderService.create({ data: body });
+  }
+
+  @ApiOperation({
+    summary: "Create new invoice by order id",
+  })
+  @ApiResponse({
+    status: 201,
+    description: "The invoice has been successfully created.",
+    type: RetryOrderResponseDto,
+  })
+  @ApiParam({
+    name: "id",
+    required: true,
+    description: "The order id",
+  })
+  @ApiInternalServerErrorResponse({
+    description: "Internal server error",
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
+  })
+  @Post("/retry/:id")
+  retryPayInvoiceOrder(
+    @Param("id") orderId: string,
+  ): Promise<RetryOrderResponseDto> {
+    return this.orderService.retryPayment(orderId);
+  }
+
+  @ApiOperation({
+    summary: "Find order by id",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "The order has been successfully find.",
+    type: OrderResponseDto,
+    schema: { nullable: true },
+  })
+  @ApiParam({
+    name: "id",
+    required: true,
+    description: "The order id",
+  })
+  @ApiInternalServerErrorResponse({
+    description: "Internal server error",
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
+  })
+  @Get("find/:id")
+  findOne(@Param("id") id: string): Promise<OrderResponseDto | null> {
+    return this.orderService.findOne({
+      where: { id },
+    });
   }
 
   @Post("callback")
