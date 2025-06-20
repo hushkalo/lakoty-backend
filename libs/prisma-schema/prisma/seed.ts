@@ -365,46 +365,12 @@ async function seedUsers() {
     console.log("create user: ", createUser);
   }
 }
-async function seedOrderStatuses() {
-  const orderStatuses = [
-    {
-      name: "new",
-    },
-    {
-      name: "in-progress",
-    },
-    {
-      name: "completed",
-    },
-    {
-      name: "canceled",
-    },
-  ];
-  for (const status of orderStatuses) {
-    const statusExist = await prisma.orderStatus.findFirst({
-      where: {
-        name: status.name,
-      },
-    });
-    if (statusExist) {
-      console.log(`Order status ${status.name} already exists in the database`);
-      continue;
-    }
-    const createStatus = await prisma.orderStatus.create({
-      data: {
-        name: status.name,
-      },
-    });
-    console.log("create order status: ", createStatus);
-  }
-}
 
 async function main() {
   await seedCategories();
   await seedProducts();
   await seedRoles();
   await seedUsers();
-  await seedOrderStatuses();
 }
 
 // execute the main function
