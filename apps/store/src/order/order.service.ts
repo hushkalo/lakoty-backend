@@ -324,8 +324,7 @@ export class OrderService {
         }),
       },
       redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout/status?&orderId=${orderId}`,
-      // webHookUrl: `${this.configService.get("BASE_URL")}/api/orders/callback`,
-      webHookUrl: "https://webhook.site/8a249e3a-51f3-4840-8958-f31ec0ad38ac",
+      webHookUrl: `${this.configService.get("BASE_URL")}/api/orders/callback`,
       validity: 36000,
     };
     const response = await this.httpService.axiosRef.post<{
