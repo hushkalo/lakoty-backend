@@ -24,4 +24,6 @@ export const configuration = () => ({
   CLIENT_URL: process.env["CLIENT_URL"],
   REDIS_HOST: process.env["REDIS_HOST"],
   REDIS_PORT: process.env["REDIS_PORT"],
+  PREPAY_ID: process.env["PREPAY_ID"],
+  POSTPAY_ID: process.env["POSTPAY_ID"],
 });

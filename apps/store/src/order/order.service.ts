@@ -22,6 +22,20 @@ export class OrderService {
     private readonly configService: ConfigService<EnvironmentVariablesForStore>,
   ) {}
 
+  findAll(params: { where: Prisma.OrderWhereInput }): Promise<OrderDto[]> {
+    return this.prisma.order.findMany({
+      ...params,
+      include: {
+        OrderProduct: {
+          include: {
+            Product: { include: { images: true } },
+            ProductSize: true,
+          },
+        },
+      },
+    });
+  }
+
   async create(params: {
     data: CreateOrderDto;
   }): Promise<CreateOrderResponseDto> {
@@ -106,7 +120,7 @@ export class OrderService {
         id: orderId,
       },
     });
-    if (!order) {
+    if (!order || order.status === "canceled") {
       return null;
     }
     const totalSum = order.OrderProduct.reduce(
@@ -118,7 +132,6 @@ export class OrderService {
     );
     const orderFromCrm = await this.getOrderFromCrm(order.keyCrmOrderId);
     const notPaidPayment = orderFromCrm.payments.find((item) => {
-      console.log(item.amount, totalSum);
       return item.status !== "canceled" && item.amount === totalSum;
     });
     if (!notPaidPayment) {
@@ -240,7 +253,10 @@ export class OrderService {
       })),
       payments: [
         {
-          payment_method_id: 27,
+          payment_method_id:
+            data.paymentType === "PREPAY"
+              ? this.configService.get("PREPAY_ID")
+              : this.configService.get("POSTPAY_ID"),
           payment_method:
             data.paymentType === "PREPAY"
               ? "Передоплата"
@@ -274,7 +290,7 @@ export class OrderService {
     await this.httpService.axiosRef.post(
       `/order/${crmOrderId}/payment`,
       {
-        payment_method_id: 27,
+        payment_method_id: this.configService.get("PREPAY_ID"),
         payment_method: "Передоплата",
         amount,
         description: "",
@@ -339,7 +355,7 @@ export class OrderService {
     return response.data;
   }
 
-  private async getOrderFromCrm(crmOrderId: number) {
+  async getOrderFromCrm(crmOrderId: number) {
     const orderFromCrm = await this.httpService.axiosRef.get<{
       id: number;
       payments: {
@@ -388,24 +404,11 @@ export class OrderService {
           item.status !== "canceled" && item.amount === data.amount / 100,
       );
       if (data.status === "success") {
-        if (notPaidPayment) {
-          await this.httpService.axiosRef.put(
-            `order/${order.keyCrmOrderId}/payment/${notPaidPayment.id}`,
-            {
-              status: "paid",
-            },
-            {
-              baseURL: this.configService.get("CRM_API_URL"),
-              headers: {
-                Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
-              },
-            },
-          );
-        } else {
+        if (!notPaidPayment) {
           await this.createCrmOrderPayment(
             orderFromCrm.id.toString(),
             data.amount / 100,
-            "paid",
+            "not_paid",
           );
         }
         return this.prisma.order.update({
@@ -444,5 +447,48 @@ export class OrderService {
       console.error(e);
       throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  async getExternalPayment(params: { from: string; to: string }) {
+    const { from, to } = params;
+    const externalPayment = await this.httpService.axiosRef.get<{
+      data: {
+        id: number;
+        uuid: number;
+        source_uuid: string;
+        amount: number;
+        description: string;
+        currency: string;
+      }[];
+    }>(`payments/external-transactions?filter[created_between]=${from},${to}`, {
+      baseURL: this.configService.get("CRM_API_URL"),
+      headers: {
+        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+      },
+    });
+    return externalPayment.data.data;
+  }
+
+  async setExternalPaymentToOrder(
+    paymentId: number,
+    data: {
+      transaction_id: number;
+      transaction_uuid: number;
+    },
+  ) {
+    await this.httpService.axiosRef.post<
+      unknown,
+      unknown,
+      {
+        transaction_id: number;
+        transaction_uuid: number;
+      }
+    >(`/payments/${paymentId}/external-transactions`, data, {
+      baseURL: this.configService.get("CRM_API_URL"),
+      headers: {
+        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+      },
+    });
+    return "OK";
   }
 }

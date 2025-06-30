@@ -89,6 +89,12 @@ export class EnvironmentVariablesForStore extends EnvironmentValidationShared {
   @IsString()
   MONOBANK_API_KEY: string;
 
+  @IsNumber()
+  PREPAY_ID: number;
+
+  @IsNumber()
+  POSTPAY_ID: number;
+
   @IsString()
   CLIENT_URL: string;
 

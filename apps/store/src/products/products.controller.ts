@@ -143,7 +143,6 @@ export class ProductsController {
       max_price?: number;
     },
   ): Promise<ProductsResponseDto> {
-    console.log(filter);
     return this.productsService.findAll({
       take: Number(take) || undefined,
       skip: Number(skip) || undefined,
@@ -152,6 +151,8 @@ export class ProductsController {
           contains: searchString,
           mode: "insensitive",
         },
+        isDeleted: false,
+        hidden: false,
         productSizes: filter?.size_name && {
           some: {
             name: {
@@ -218,7 +219,7 @@ export class ProductsController {
   })
   findOne(@Param("id") id: string): Promise<ProductDto> {
     return this.productsService.findOne({
-      where: { id },
+      where: { id, isDeleted: false, hidden: false },
     });
   }
 
@@ -239,7 +240,7 @@ export class ProductsController {
     @Param("alias") alias: string,
   ): Promise<ProductWithRecommendationResponseDto> {
     const product = await this.productsService.findOne({
-      where: { alias },
+      where: { alias, isDeleted: false, hidden: false },
     });
     if (!product) {
       return null;
@@ -249,6 +250,8 @@ export class ProductsController {
         category: {
           id: product.categoryId,
         },
+        isDeleted: false,
+        hidden: false,
       },
     });
     return {

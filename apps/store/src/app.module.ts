@@ -8,7 +8,8 @@ import { OrderModule } from "./order/order.module";
 import { NovaPostModule } from "./nova-post/nova-post.module";
 import { CourseModule } from "./course/course.module";
 import { RedisModule } from "./redis/redis.module";
-
+import { ScheduleModule } from "@nestjs/schedule";
+import { TasksModule } from "./task/task.module";
 @Module({
   imports: [
     CategoriesModule,
@@ -24,6 +25,8 @@ import { RedisModule } from "./redis/redis.module";
       validate,
     }),
     RedisModule.forRoot(),
+    ScheduleModule.forRoot(),
+    TasksModule,
   ],
   providers: [],
 })
