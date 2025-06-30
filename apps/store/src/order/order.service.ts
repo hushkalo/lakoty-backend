@@ -384,7 +384,8 @@ export class OrderService {
         data.status === "created" ||
         !order ||
         order.status === "failure" ||
-        order.status === "success"
+        order.status === "success" ||
+        order.status === "completed"
       )
         return;
 
