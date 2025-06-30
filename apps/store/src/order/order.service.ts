@@ -387,7 +387,7 @@ export class OrderService {
         order.status === "success" ||
         order.status === "completed"
       )
-        return;
+        return "OK";
 
       if (data.status === "processing") {
         return this.prisma.order.update({
