@@ -10,7 +10,7 @@ export class TasksService {
   ) {}
   SERVICE_NAME = "task";
 
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async handleHandlePayment() {
     this.logger.debug("Handle payment start");
     const orders = await this.orderService.findAll({
