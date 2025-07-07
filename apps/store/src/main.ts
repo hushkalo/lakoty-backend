@@ -25,7 +25,7 @@ async function bootstrap() {
     configService.get("NODE_ENV") === "stage"
   ) {
     app.enableCors({
-      methods: ["GET", "POST"],
+      methods: "*",
       origin: [
         "http://localhost:3000",
         "http://localhost:5173",

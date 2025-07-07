@@ -5,14 +5,27 @@ import {
   CategoryWithCountSubCategoriesResponseDto,
 } from "./dto/responses.dto";
 import { CategoryDto, TreeCategoryDto } from "./dto/category.dto";
+import { RedisService } from "../redis/redis.service";
 
 @Injectable()
 export class CategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async findOne(params: {
     where: Prisma.CategoryWhereUniqueInput;
   }): Promise<CategoryWithCountSubCategoriesResponseDto> {
+    const redisData =
+      await this.redisService.get<CategoryWithCountSubCategoriesResponseDto>(
+        `categories/findOne?${JSON.stringify(params)}`,
+      );
+
+    if (redisData) {
+      return redisData;
+    }
+
     const category = await this.prisma.category.findUnique({
       where: {
         ...params.where,
@@ -53,10 +66,18 @@ export class CategoriesService {
     if (!category) {
       return null;
     }
-    return {
+
+    const response = {
       ...category,
       countSubCategories: category.subCategories.length,
     };
+
+    await this.redisService.set(
+      `categories/findOne?${JSON.stringify(params)}`,
+      response,
+      60,
+    );
+    return response;
   }
 
   countCategories(params?: {
@@ -72,6 +93,14 @@ export class CategoriesService {
     where?: Prisma.CategoryWhereInput;
     orderBy?: Prisma.CategoryOrderByWithRelationInput[];
   }): Promise<CategoriesResponseDto> {
+    const redisData = await this.redisService.get<CategoriesResponseDto>(
+      `categories/findAll?${JSON.stringify(params)}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     const { withSubCategories, where, ...restParams } = params;
     const count = await this.countCategories({
       where: {
@@ -108,21 +137,41 @@ export class CategoriesService {
         updatedAt: true,
       },
     });
-    return {
+
+    const response = {
       data,
       total: count,
       to: data.length,
     };
+
+    await this.redisService.set(
+      `categories/findAll?${JSON.stringify(params)}`,
+      response,
+      60,
+    );
+
+    return response;
   }
 
   async getTreeCategoriesById(
     categoryId: string,
     flat = false,
   ): Promise<TreeCategoryDto | TreeCategoryDto[] | null> {
+    const redisData = await this.redisService.get<
+      TreeCategoryDto | TreeCategoryDto[]
+    >(
+      `categories/getTreeCategoriesById?categoriesId=${categoryId}&flat=${flat}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     const treeCategories = await this.getTreeCategories({
       isFlat: true,
       categoryId,
     });
+
     if (!treeCategories) {
       return null;
     }
@@ -162,12 +211,22 @@ export class CategoriesService {
     const subTree = buildCategorySubTree(treeCategories, categoryId);
     if (!subTree) return null;
 
-    // Если flat === true, возвращаем плоский список
     if (flat) {
-      return flattenCategoryTree(subTree);
+      const result = flattenCategoryTree(subTree);
+      await this.redisService.set(
+        `categories/getTreeCategoriesById?categoriesId=${categoryId}&flat=true`,
+        result,
+        60,
+      );
+      return result;
     }
 
-    // Иначе возвращаем поддерево
+    await this.redisService.set(
+      `categories/getTreeCategoriesById?categoriesId=${categoryId}&flat=true`,
+      subTree,
+      60,
+    );
+
     return subTree;
   }
 
@@ -177,6 +236,14 @@ export class CategoriesService {
     categoryId?: string;
     maxDepth?: string;
   }): Promise<TreeCategoryDto[] | null> {
+    const redisData = await this.redisService.get<TreeCategoryDto[]>(
+      `categories/getTreeCategories?${JSON.stringify(params)}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     if (params.alias || params.categoryId) {
       const category = await this.findOne({
         where: {
@@ -207,11 +274,17 @@ export class CategoriesService {
     });
 
     if (params.isFlat) {
-      // Плоский список всех категорий с пустыми children
-      return Array.from(categoryMap.values());
+      const result = Array.from(categoryMap.values());
+
+      await this.redisService.set(
+        `categories/getTreeCategories?${JSON.stringify(params)}`,
+        result,
+        60,
+      );
+
+      return result;
     }
 
-    // Иначе — построить дерево
     const maxDepth = params.maxDepth ? parseInt(params.maxDepth) : undefined;
 
     function buildCategoryTree(
@@ -241,10 +314,26 @@ export class CategoriesService {
       return roots;
     }
 
-    return buildCategoryTree(data, maxDepth);
+    const result = buildCategoryTree(data, maxDepth);
+
+    await this.redisService.set(
+      `categories/getTreeCategories?${JSON.stringify(params)}`,
+      result,
+      60,
+    );
+
+    return result;
   }
 
   async getAllSubCategoryIds(categoryId: string): Promise<string[]> {
+    const redisData = await this.redisService.get<string[]>(
+      `categories/getAllSubCategoryIds?categoryId=${categoryId}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     const rootCategory = await this.prisma.category.findUnique({
       where: {
         id: categoryId,
@@ -258,7 +347,6 @@ export class CategoriesService {
       return [];
     }
 
-    // Рекурсивно собираем ID подкатегорий
     const categoryIds: string[] = [rootCategory.id];
     const stack: string[] = [rootCategory.id];
 
@@ -278,6 +366,12 @@ export class CategoriesService {
         stack.push(subCat.id);
       }
     }
+
+    await this.redisService.set(
+      `categories/getAllSubCategoryIds?categoryId=${categoryId}`,
+      categoryIds,
+      60,
+    );
 
     return categoryIds;
   }

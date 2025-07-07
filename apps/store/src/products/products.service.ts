@@ -6,12 +6,14 @@ import {
   ProductsResponseDto,
 } from "./dto/responses.dto";
 import { CategoriesService } from "../categories/categories.service";
+import { RedisService } from "../redis/redis.service";
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly categoryService: CategoriesService,
+    private readonly redisService: RedisService,
   ) {}
 
   async findAll(params: {
@@ -20,6 +22,14 @@ export class ProductsService {
     where?: Prisma.ProductWhereInput;
     orderBy?: Prisma.ProductOrderByWithRelationInput[];
   }): Promise<ProductsResponseDto> {
+    const redisData = await this.redisService.get<ProductsResponseDto>(
+      `products/findAll?${JSON.stringify(params)}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     const products = await this.prisma.product.findMany({
       ...params,
       include: {
@@ -48,11 +58,19 @@ export class ProductsService {
       where: params.where,
     });
 
-    return {
+    const response = {
       data: products,
       total,
       to: products.length,
     };
+
+    await this.redisService.set(
+      `products/findAll?${JSON.stringify(params)}`,
+      response,
+      60,
+    );
+
+    return response;
   }
 
   countProducts(params?: {
@@ -96,6 +114,14 @@ export class ProductsService {
   async findOne(params: {
     where: Prisma.ProductWhereUniqueInput;
   }): Promise<ProductDto> {
+    const redisData = await this.redisService.get<ProductDto>(
+      `products/findOne?${JSON.stringify(params)}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     const product = await this.prisma.product.findUnique({
       ...params,
       include: {
@@ -127,12 +153,25 @@ export class ProductsService {
     if (!product) {
       return null;
     }
+    await this.redisService.set(
+      `products/findOne?${JSON.stringify(params)}`,
+      product,
+      60,
+    );
     return product;
   }
 
   async getSizeByCategoryAlias(
     categoryId?: string,
   ): Promise<ProductSizesResponseDto> {
+    const redisData = await this.redisService.get<ProductSizesResponseDto>(
+      `products/sizes/all?categoryId=${categoryId || ""}`,
+    );
+
+    if (redisData) {
+      return redisData;
+    }
+
     if (!categoryId) {
       const sizes = await this.prisma.productSize.findMany({
         where: {
@@ -146,10 +185,20 @@ export class ProductsService {
           name: "asc",
         },
       });
-      return {
+
+      const response = {
         data: sizes.map((size) => size.name),
       };
+
+      await this.redisService.set(
+        `products/sizes/all?categoryId=`,
+        response,
+        60,
+      );
+
+      return;
     }
+
     const categoryIds =
       await this.categoryService.getAllSubCategoryIds(categoryId);
 
@@ -176,6 +225,15 @@ export class ProductsService {
         name: "asc",
       },
     });
-    return { data: sizes.map((size) => size.name) };
+
+    const response = { data: sizes.map((size) => size.name) };
+
+    await this.redisService.set(
+      `products/sizes/all?categoryId=${categoryId}`,
+      response,
+      60,
+    );
+
+    return response;
   }
 }

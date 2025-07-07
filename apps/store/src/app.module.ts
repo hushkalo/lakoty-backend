@@ -10,6 +10,7 @@ import { CourseModule } from "./course/course.module";
 import { RedisModule } from "./redis/redis.module";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TasksModule } from "./task/task.module";
+import { BasketModule } from "./basket/basket.module";
 @Module({
   imports: [
     CategoriesModule,
@@ -27,6 +28,7 @@ import { TasksModule } from "./task/task.module";
     RedisModule.forRoot(),
     ScheduleModule.forRoot(),
     TasksModule,
+    BasketModule,
   ],
   providers: [],
 })
