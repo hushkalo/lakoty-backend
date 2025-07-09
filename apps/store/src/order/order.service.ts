@@ -13,6 +13,7 @@ import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
 import { OrderDto, OrderProductDto } from "./dto/order.dto";
 import { CreateOrderCrmDto } from "./dto/create.order.crm.dto";
 import { AxiosResponse } from "axios";
+import { BasketService } from "../basket/basket.service";
 
 @Injectable()
 export class OrderService {
@@ -20,6 +21,7 @@ export class OrderService {
     private readonly httpService: HttpService,
     private prisma: PrismaService,
     private readonly configService: ConfigService<EnvironmentVariablesForStore>,
+    private readonly basketService: BasketService,
   ) {}
 
   findAll(params: { where: Prisma.OrderWhereInput }): Promise<OrderDto[]> {
@@ -38,7 +40,12 @@ export class OrderService {
 
   async create(params: {
     data: CreateOrderDto;
+    sessionId: string;
   }): Promise<CreateOrderResponseDto> {
+    if (params.sessionId) {
+      await this.basketService.clearBasket(params.sessionId);
+    }
+
     const { data } = params;
     try {
       const orderFromCrm = await this.createOrderInCrm(data);
@@ -239,7 +246,6 @@ export class OrderService {
         sku: item.sku,
         price: item.price,
         discount_percent: item.discount,
-        discount_amount: Math.round((item.price * item.discount) / 100),
         quantity: item.quantity,
         unit_type: "од.",
         name: item.name,

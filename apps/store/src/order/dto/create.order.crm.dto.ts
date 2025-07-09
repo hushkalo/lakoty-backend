@@ -38,7 +38,6 @@ export class ProductDto {
   sku: string;
   price: number;
   discount_percent: number;
-  discount_amount: number;
   quantity: number;
   unit_type: string;
   name: string;

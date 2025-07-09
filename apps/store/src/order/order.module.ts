@@ -5,9 +5,16 @@ import { PrismaModule } from "@libs/prisma-client";
 import { ProductsModule } from "../products/products.module";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
+import { BasketModule } from "../basket/basket.module";
 
 @Module({
-  imports: [PrismaModule, ProductsModule, ConfigModule, HttpModule],
+  imports: [
+    PrismaModule,
+    ProductsModule,
+    ConfigModule,
+    HttpModule,
+    BasketModule,
+  ],
   controllers: [OrderController],
   providers: [OrderService, Logger],
   exports: [OrderService],

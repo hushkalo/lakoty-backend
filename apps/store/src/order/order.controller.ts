@@ -1,4 +1,12 @@
-import { Controller, Post, Body, UsePipes, Param, Get } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Body,
+  UsePipes,
+  Param,
+  Get,
+  Query,
+} from "@nestjs/common";
 import { OrderService } from "./order.service";
 import {
   ApiBadRequestResponse,
@@ -145,8 +153,11 @@ export class OrderController {
   })
   @UsePipes(OrderValidationPipe)
   @Post()
-  create(@Body() body: CreateOrderDto): Promise<CreateOrderResponseDto> {
-    return this.orderService.create({ data: body });
+  create(
+    @Body() body: CreateOrderDto,
+    @Query("sessionId") sessionId?: string,
+  ): Promise<CreateOrderResponseDto> {
+    return this.orderService.create({ data: body, sessionId });
   }
 
   @ApiOperation({
