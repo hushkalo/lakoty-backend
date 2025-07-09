@@ -217,7 +217,7 @@ export class OrderService {
     const userComment = data.comment ? `Коментар клієнта: ${data.comment}` : "";
     const bodyOrder = {
       source_id: 20,
-      manager_id: 16,
+      manager_id: Number(this.configService.get("MANAGER_ID")),
       buyer_comment: [
         userComment,
         messageMessenger,
