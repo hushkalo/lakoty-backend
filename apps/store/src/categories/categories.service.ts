@@ -104,11 +104,18 @@ export class CategoriesService {
         ...where,
         isDeleted: false,
         hidden: false,
-        products: {
-          some: {
-            isDeleted: false,
+        OR: [
+          {
+            products: {
+              some: {
+                isDeleted: false,
+              },
+            },
           },
-        },
+          {
+            depth: 0,
+          },
+        ],
       },
     });
     const data = await this.prisma.category.findMany({
@@ -117,11 +124,18 @@ export class CategoriesService {
         ...where,
         isDeleted: false,
         hidden: false,
-        products: {
-          some: {
-            isDeleted: false,
+        OR: [
+          {
+            products: {
+              some: {
+                isDeleted: false,
+              },
+            },
           },
-        },
+          {
+            depth: 0,
+          },
+        ],
       },
       include: {
         subCategories: withSubCategories
@@ -265,11 +279,18 @@ export class CategoriesService {
       where: {
         isDeleted: false,
         hidden: false,
-        products: {
-          some: {
-            isDeleted: false,
+        OR: [
+          {
+            products: {
+              some: {
+                isDeleted: false,
+              },
+            },
           },
-        },
+          {
+            depth: 0,
+          },
+        ],
       },
       omit: {
         keyCrmId: true,
@@ -348,11 +369,18 @@ export class CategoriesService {
         id: categoryId,
         isDeleted: false,
         hidden: false,
-        products: {
-          some: {
-            isDeleted: false,
+        OR: [
+          {
+            products: {
+              some: {
+                isDeleted: false,
+              },
+            },
           },
-        },
+          {
+            depth: 0,
+          },
+        ],
       },
       select: { id: true },
     });
