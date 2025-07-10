@@ -41,7 +41,6 @@ export class CategoriesService {
           omit: {
             keyCrmId: true,
             createdAt: true,
-            updatedAt: true,
           },
         },
         subCategories: {
@@ -52,14 +51,12 @@ export class CategoriesService {
           omit: {
             keyCrmId: true,
             createdAt: true,
-            updatedAt: true,
           },
         },
       },
       omit: {
         keyCrmId: true,
         createdAt: true,
-        updatedAt: true,
       },
     });
 
@@ -126,7 +123,6 @@ export class CategoriesService {
               omit: {
                 keyCrmId: true,
                 createdAt: true,
-                updatedAt: true,
               },
             }
           : false,
@@ -134,7 +130,6 @@ export class CategoriesService {
       omit: {
         keyCrmId: true,
         createdAt: true,
-        updatedAt: true,
       },
     });
 
@@ -264,7 +259,6 @@ export class CategoriesService {
       omit: {
         keyCrmId: true,
         createdAt: true,
-        updatedAt: true,
       },
     });
 

@@ -63,6 +63,11 @@ export class CategoryDto {
     example: ["adyag", "zip-hudi"],
   })
   pathname: string[];
+
+  @ApiProperty({
+    description: "Last update date",
+  })
+  updatedAt: Date;
 }
 
 export class TreeCategoryDto extends CategoryDto {

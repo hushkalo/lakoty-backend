@@ -133,6 +133,12 @@ export class ProductDto {
     ],
   })
   productSizes: ProductSizeDto[];
+
+  @ApiProperty({
+    description: "Last update product",
+    example: "2023-10-01T12:00:00Z",
+  })
+  updatedAt: Date;
 }
 
 export class RecommendationProductDto extends OmitType(ProductDto, [

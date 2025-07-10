@@ -50,7 +50,6 @@ export class ProductsService {
         category: true,
       },
       omit: {
-        updatedAt: true,
         createdAt: true,
       },
     });
@@ -104,7 +103,6 @@ export class ProductsService {
       omit: {
         categoryId: true,
         createdAt: true,
-        updatedAt: true,
         keyCrmId: true,
         quantity: true,
       },
@@ -146,7 +144,6 @@ export class ProductsService {
       },
       omit: {
         createdAt: true,
-        updatedAt: true,
       },
     });
 
