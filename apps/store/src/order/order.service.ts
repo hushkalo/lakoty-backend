@@ -267,7 +267,7 @@ export class OrderService {
             data.paymentType === "PREPAY"
               ? "Передоплата"
               : "Оплата при отриманні",
-          amount: data.paymentType === "PREPAY" ? totalSum : 200,
+          amount: totalSum,
           description: "",
           status: "not_paid",
         },
