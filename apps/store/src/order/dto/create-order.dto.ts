@@ -45,6 +45,16 @@ class CreateOrderProductSizeDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiProperty({
+    description: "Size ID",
+    example: "clhlw1mlq0000ksvm3gfy3eur",
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  sku?: string;
 }
 
 class CreateOrderProductDto {

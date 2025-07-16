@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 class BasketItemSizeDto {
   @ApiProperty({
     description: "The id size of the basket item",
-    required: true,
+    required: false,
   })
   id?: string;
 
@@ -11,6 +11,9 @@ class BasketItemSizeDto {
     description: "The name size of the basket item",
   })
   name: string;
+
+  @ApiPropertyOptional({ description: "Stock Keeping Unit", required: false })
+  sku?: string;
 }
 
 export class BasketItemDto {

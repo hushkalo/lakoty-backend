@@ -243,7 +243,7 @@ export class OrderService {
         warehouse_ref: data.warehouseRef,
       },
       products: data.orderProducts.map((item) => ({
-        sku: item.sku,
+        sku: item?.size?.sku ? item.size.sku : item.sku,
         price: item.price,
         discount_percent: item.discount,
         quantity: item.quantity,

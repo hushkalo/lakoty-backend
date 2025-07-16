@@ -263,6 +263,7 @@ async function seedProducts() {
         quantity: product.quantity,
         createdAt: new Date(product.created_at),
         updatedAt: new Date(product.updated_at),
+        sku: product.sku,
         hidden: product.is_archived,
         keyCrmId: product.id,
         category: {
