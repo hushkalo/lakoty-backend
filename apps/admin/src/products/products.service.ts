@@ -255,7 +255,11 @@ export class ProductsService {
     return this.prisma.product.findUnique({
       where: params.where,
       include: {
-        images: true,
+        images: {
+          orderBy: {
+            order: "asc",
+          },
+        },
         productSizes: true,
         category: true,
         _count: true,
@@ -293,7 +297,7 @@ export class ProductsService {
                 },
                 upsert: images.map((image) => ({
                   where: { id: image.id || "" },
-                  update: { url: image.url },
+                  update: { url: image.url, order: image.order },
                   create: {
                     url: image.url,
                     order: image.order,

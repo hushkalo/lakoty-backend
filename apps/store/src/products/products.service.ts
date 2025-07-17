@@ -37,6 +37,9 @@ export class ProductsService {
           select: {
             url: true,
           },
+          orderBy: {
+            order: "asc",
+          },
         },
         productSizes: {
           select: {
@@ -126,6 +129,9 @@ export class ProductsService {
         images: {
           select: {
             url: true,
+          },
+          orderBy: {
+            order: "asc",
           },
         },
         productSizes: {
