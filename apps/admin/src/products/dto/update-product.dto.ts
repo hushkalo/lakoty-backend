@@ -135,6 +135,15 @@ export class UpdateProductDto {
   top: boolean;
 
   @ApiProperty({
+    description: "Flag indicating if this is a novelty product",
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isNovelty: boolean;
+
+  @ApiProperty({
     description: "Available sizes for the product",
     type: UpdateProductSize,
     isArray: true,

@@ -120,6 +120,11 @@ export class ProductDto {
   category: CategoryDto;
 
   @ApiProperty({
+    description: "Is novelty product?",
+  })
+  isNovelty: boolean;
+
+  @ApiProperty({
     type: [ProductSizeDto],
     description: "Array of product sizes",
     example: [

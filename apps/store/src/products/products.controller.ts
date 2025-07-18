@@ -180,9 +180,7 @@ export class ProductsController {
           parentCategoryId: categoryAlias ? undefined : parentCategoryId,
         },
         discount: sale ? { gt: 1 } : undefined,
-        createdAt: novelty
-          ? { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
-          : undefined,
+        isNovelty: Boolean(novelty),
       },
       orderBy: [
         {

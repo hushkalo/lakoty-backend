@@ -174,6 +174,9 @@ export class ProductDto {
   @ApiProperty({ description: "Whether product is hidden", example: false })
   hidden: boolean;
 
+  @ApiProperty({ description: "Is novelty product?", example: false })
+  isNovelty: boolean;
+
   @ApiProperty({ description: "Total sales count", example: 100 })
   salesCount: number;
 

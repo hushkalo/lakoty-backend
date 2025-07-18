@@ -7,7 +7,6 @@ import { UploadModule } from "./upload/upload.module";
 import { StatusModule } from "./status/status.module";
 import { UserModule } from "./user/user.module";
 import { AuthModule } from "./auth/auth.module";
-import { OrderModule } from "./order/order.module";
 import { validate, configuration } from "@shared/configuration";
 import { NovaPostModule } from "./nova-post/nova-post.module";
 
@@ -26,7 +25,6 @@ import { NovaPostModule } from "./nova-post/nova-post.module";
     StatusModule,
     UserModule,
     AuthModule,
-    OrderModule,
     NovaPostModule,
   ],
   providers: [],
