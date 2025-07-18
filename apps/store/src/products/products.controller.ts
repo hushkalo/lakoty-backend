@@ -180,11 +180,14 @@ export class ProductsController {
           parentCategoryId: categoryAlias ? undefined : parentCategoryId,
         },
         discount: sale ? { gt: 1 } : undefined,
-        isNovelty: Boolean(novelty),
+        isNovelty: novelty ? novelty : undefined,
       },
       orderBy: [
         {
           top: sortBy === "popular" ? "desc" : undefined,
+        },
+        {
+          isNovelty: "desc",
         },
         {
           price: sortBy === "chipper" ? "asc" : undefined,
