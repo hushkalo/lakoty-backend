@@ -134,7 +134,7 @@ export class ProductsController {
     @Query("alias") alias?: string,
     @Query("categoryAlias") categoryAlias?: string,
     @Query("sale") sale?: boolean,
-    @Query("novelty") novelty?: boolean,
+    @Query("novelty") novelty?: string,
     @Query("filter")
     filter?: {
       size_name?: string;
@@ -144,8 +144,8 @@ export class ProductsController {
     },
   ): Promise<ProductsResponseDto> {
     return this.productsService.findAll({
-      take: Number(take) || undefined,
-      skip: Number(skip) || undefined,
+      take: Number(take) || 12,
+      skip: Number(skip) || 0,
       where: {
         name: {
           contains: searchString,
@@ -180,7 +180,7 @@ export class ProductsController {
           parentCategoryId: categoryAlias ? undefined : parentCategoryId,
         },
         discount: sale ? { gt: 1 } : undefined,
-        isNovelty: novelty ? novelty : undefined,
+        isNovelty: novelty === "true" ? true : undefined,
       },
       orderBy: [
         {
