@@ -6,6 +6,7 @@ import { ProductsModule } from "../products/products.module";
 import { HttpModule } from "@nestjs/axios";
 import { ConfigModule } from "@nestjs/config";
 import { BasketModule } from "../basket/basket.module";
+import { RedisModule } from "../redis/redis.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { BasketModule } from "../basket/basket.module";
     ConfigModule,
     HttpModule,
     BasketModule,
+    RedisModule,
   ],
   controllers: [OrderController],
   providers: [OrderService, Logger],

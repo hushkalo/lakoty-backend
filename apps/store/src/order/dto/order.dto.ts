@@ -201,6 +201,12 @@ export class OrderDto {
   status: string;
 
   @ApiProperty({
+    description: "Payment status of the order",
+    example: "no_paid",
+  })
+  paymentStatus: string;
+
+  @ApiProperty({
     description: "Timestamp when the order was created",
     example: "2025-06-18T20:34:00Z",
   })

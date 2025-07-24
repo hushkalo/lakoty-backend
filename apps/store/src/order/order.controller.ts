@@ -14,11 +14,13 @@ import {
   ApiInternalServerErrorResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
 import {
   CreateOrderResponseDto,
+  MyOrdersDto,
   OrderResponseDto,
   RetryOrderResponseDto,
 } from "./dto/responses.dto";
@@ -26,6 +28,7 @@ import { OrderValidationPipe } from "../pipes/order-validation.pipe";
 import { AppError, ErrorModel } from "@shared/error-model";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
+import { CallbackRequestBodyDto } from "./dto/callback.dto";
 
 @ApiTags("Orders")
 @Controller("orders")
@@ -209,6 +212,65 @@ export class OrderController {
     return this.orderService.findOne({
       where: { id },
     });
+  }
+
+  @ApiOperation({
+    summary: "Get orders by phone number with pagination",
+  })
+  @ApiQuery({
+    name: "phoneNumber",
+    required: false,
+    description: "Phone number to search orders for",
+    example: "+380501234567",
+  })
+  @ApiQuery({
+    name: "sessionId",
+    required: true,
+    description: "Session id",
+    example: "+380501234567",
+  })
+  @ApiQuery({
+    name: "take",
+    required: true,
+    type: Number,
+    description: "Number of orders to take (default: 10)",
+    example: 10,
+  })
+  @ApiQuery({
+    name: "skip",
+    required: true,
+    type: Number,
+    description: "Number of orders to skip for pagination (default: 0)",
+    example: 0,
+  })
+  @ApiResponse({
+    status: 200,
+    description: "List of orders for the specified phone number",
+    type: MyOrdersDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: "Internal server error",
+    type: AppError,
+    example: ErrorModel.INTERNAL_SERVER_ERROR,
+  })
+  @Get("my-orders")
+  async getMyOrders(
+    @Query("sessionId") sessionId: string,
+    @Query("take") take: string,
+    @Query("skip") skip: string,
+    @Query("phoneNumber") phoneNumber?: string,
+  ): Promise<MyOrdersDto> {
+    return this.orderService.getMyOrders({
+      phoneNumber,
+      sessionId,
+      take: Number(take) || 10,
+      skip: Number(skip) || 0,
+    });
+  }
+
+  @Post("callback/change-status")
+  async callbackChangeOrderStatus(@Body() body: CallbackRequestBodyDto) {
+    return this.orderService.changeStatusOrder(body);
   }
 
   @Post("callback")

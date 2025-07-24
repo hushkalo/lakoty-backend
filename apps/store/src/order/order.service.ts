@@ -4,6 +4,7 @@ import { HttpService } from "@nestjs/axios";
 import { ErrorModel } from "@shared/error-model";
 import {
   CreateOrderResponseDto,
+  MyOrdersDto,
   RetryOrderResponseDto,
 } from "./dto/responses.dto";
 import { Prisma, PrismaService } from "@libs/prisma-client";
@@ -14,6 +15,10 @@ import { OrderDto, OrderProductDto } from "./dto/order.dto";
 import { CreateOrderCrmDto } from "./dto/create.order.crm.dto";
 import { AxiosResponse } from "axios";
 import { BasketService } from "../basket/basket.service";
+import { OrderStatusDto } from "./dto/order-status.dto";
+import { CallbackRequestBodyDto } from "./dto/callback.dto";
+import { StatusEnum } from "./enum/status.enum";
+import { RedisService } from "../redis/redis.service";
 
 @Injectable()
 export class OrderService {
@@ -22,9 +27,18 @@ export class OrderService {
     private prisma: PrismaService,
     private readonly configService: ConfigService<EnvironmentVariablesForStore>,
     private readonly basketService: BasketService,
+    private readonly redis: RedisService,
   ) {}
 
-  findAll(params: { where: Prisma.OrderWhereInput }): Promise<OrderDto[]> {
+  private getKey(sessionId: string) {
+    return `orders:${sessionId}`;
+  }
+
+  findAll(params: {
+    take: number;
+    skip: number;
+    where: Prisma.OrderWhereInput;
+  }): Promise<OrderDto[]> {
     return this.prisma.order.findMany({
       ...params,
       include: {
@@ -35,7 +49,14 @@ export class OrderService {
           },
         },
       },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
+  }
+
+  count(params?: { where: Prisma.OrderWhereInput }): Promise<number> {
+    return this.prisma.order.count(params);
   }
 
   async create(params: {
@@ -100,9 +121,25 @@ export class OrderService {
               crmOrderId: orderFromCrm.id.toString(),
             })
           : undefined;
+
       await this.update(newOrder.id, {
         invoiceId: invoice?.invoiceId,
       });
+
+      if (params.sessionId) {
+        const session = await this.redis.get<string>(
+          this.getKey(params.sessionId),
+        );
+
+        if (!session) {
+          await this.redis.set<string>(
+            this.getKey(params.sessionId),
+            newOrder.phoneNumber,
+            60 * 60 * 24,
+          );
+        }
+      }
+
       return {
         message: "Order created successfully.",
         paymentPageUrl: invoice?.pageUrl,
@@ -127,7 +164,7 @@ export class OrderService {
         id: orderId,
       },
     });
-    if (!order || order.status === "canceled") {
+    if (!order || order.paymentStatus === "canceled") {
       return null;
     }
     const totalSum = order.OrderProduct.reduce(
@@ -155,7 +192,7 @@ export class OrderService {
     });
     await this.update(order.id, {
       invoiceId: newInvoice.invoiceId,
-      status: "retry",
+      paymentStatus: "retry",
     });
     return {
       message: "Invoice has been created",
@@ -219,10 +256,10 @@ export class OrderService {
       source_id: 20,
       manager_id: Number(this.configService.get("MANAGER_ID")),
       buyer_comment: [
-        userComment,
         messageMessenger,
         messagePayment,
         messageCall,
+        userComment,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -389,9 +426,9 @@ export class OrderService {
       if (
         data.status === "created" ||
         !order ||
-        order.status === "failure" ||
-        order.status === "success" ||
-        order.status === "completed"
+        order.paymentStatus === "failure" ||
+        order.paymentStatus === "success" ||
+        order.paymentStatus === "completed"
       )
         return "OK";
 
@@ -401,7 +438,7 @@ export class OrderService {
             id: order.id,
           },
           data: {
-            status: "processing",
+            paymentStatus: "processing",
           },
         });
       }
@@ -423,7 +460,7 @@ export class OrderService {
             id: order.id,
           },
           data: {
-            status: "success",
+            paymentStatus: "success",
           },
         });
       }
@@ -445,7 +482,7 @@ export class OrderService {
             id: order.id,
           },
           data: {
-            status: "failure",
+            paymentStatus: "failure",
           },
         });
       }
@@ -497,5 +534,202 @@ export class OrderService {
       },
     });
     return "OK";
+  }
+
+  async changeStatusOrder(data: CallbackRequestBodyDto) {
+    const { context } = data;
+    const statusOrder = await this.httpService.axiosRef.get<{
+      data: OrderStatusDto[];
+    }>(`/order/status`, {
+      baseURL: this.configService.get("CRM_API_URL"),
+      headers: {
+        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+      },
+    });
+
+    const findStatus = statusOrder.data.data.find(
+      (item) => item.id === context.status_id,
+    );
+
+    if (!findStatus) {
+      console.log(`Order status not found: ${context.status_id}`);
+      return "OK";
+    }
+
+    if (findStatus.id === StatusEnum.READY_TO_DELIVERY) {
+      await this.prisma.order.update({
+        where: {
+          keyCrmOrderId: context.id,
+        },
+        data: {
+          status: "ready_to_delivery",
+        },
+      });
+      return "OK";
+    }
+
+    if (findStatus.id === StatusEnum.ON_ROAD) {
+      await this.prisma.order.update({
+        where: {
+          keyCrmOrderId: context.id,
+        },
+        data: {
+          status: "on_road",
+        },
+      });
+      return "OK";
+    }
+
+    if (findStatus.id === StatusEnum.ARRIVED) {
+      await this.prisma.order.update({
+        where: {
+          keyCrmOrderId: context.id,
+        },
+        data: {
+          status: "arrived",
+        },
+      });
+      return "OK";
+    }
+
+    if (findStatus.id === StatusEnum.DONE) {
+      await this.prisma.order.update({
+        where: {
+          keyCrmOrderId: context.id,
+        },
+        data: {
+          status: "done",
+          paymentStatus: "completed",
+        },
+      });
+      return "OK";
+    }
+
+    if (findStatus.id === StatusEnum.CANCELED) {
+      await this.prisma.order.update({
+        where: {
+          keyCrmOrderId: context.id,
+        },
+        data: {
+          status: "canceled",
+          paymentStatus: "canceled",
+        },
+      });
+      return "OK";
+    }
+
+    return "OK";
+  }
+
+  async getMyOrders(params: {
+    sessionId: string;
+    phoneNumber?: string;
+    take: number;
+    skip: number;
+  }): Promise<MyOrdersDto> {
+    const { sessionId, take, skip, phoneNumber } = params;
+    const timeExpired = 60 * 60 * 24;
+    const userSession = await this.redis.get<string>(this.getKey(sessionId));
+    const userSessionData = await this.redis.get<MyOrdersDto>(
+      `${this.getKey(sessionId)}?take=${take}&skip=${skip}`,
+    );
+
+    if (userSessionData) {
+      return userSessionData;
+    }
+
+    if (!userSession && !phoneNumber) {
+      return {
+        countArrived: 0,
+        countOnRoad: 0,
+        orders: [],
+        total: 0,
+        to: 0,
+      };
+    }
+
+    if (!userSession && phoneNumber) {
+      const orders = await this.findAll({
+        take,
+        skip,
+        where: {
+          phoneNumber,
+        },
+      });
+
+      const total = await this.count();
+
+      const countArrived = await this.count({
+        where: {
+          status: "arrived",
+        },
+      });
+
+      const countOnRoad = await this.count({
+        where: {
+          status: "on_road",
+        },
+      });
+
+      const result = {
+        countArrived,
+        countOnRoad,
+        orders,
+        total,
+        to: orders.length,
+      };
+      if (total !== 0) {
+        await this.redis.set<string>(
+          this.getKey(sessionId),
+          phoneNumber,
+          timeExpired,
+        );
+        await this.redis.set<MyOrdersDto>(
+          `${this.getKey(sessionId)}?take=${take}&skip=${skip}`,
+          result,
+          60,
+        );
+      }
+
+      return result;
+    }
+
+    const orders = await this.findAll({
+      take,
+      skip,
+      where: {
+        phoneNumber: userSession,
+      },
+    });
+
+    const total = await this.count();
+
+    const countArrived = await this.count({
+      where: {
+        status: "arrived",
+      },
+    });
+
+    const countOnRoad = await this.count({
+      where: {
+        status: "on_road",
+      },
+    });
+
+    const result = {
+      countArrived,
+      countOnRoad,
+      orders,
+      total,
+      to: orders.length,
+    };
+
+    await this.redis.set<MyOrdersDto>(
+      `${this.getKey(sessionId)}?take=${take}&skip=${skip}`,
+      result,
+      60,
+    );
+
+    return result;
   }
 }

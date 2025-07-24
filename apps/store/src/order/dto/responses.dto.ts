@@ -40,3 +40,36 @@ export class RetryOrderResponseDto {
 }
 
 export class OrderResponseDto extends OrderDto {}
+
+export class MyOrdersDto {
+  @ApiProperty({
+    description: "Count order arrived",
+    type: OrderDto,
+    isArray: true,
+  })
+  orders: OrderDto[];
+
+  @ApiProperty({
+    description: "Total orders sum",
+    example: 3,
+  })
+  countArrived: number;
+
+  @ApiProperty({
+    description: "Count order on road",
+    example: 4,
+  })
+  countOnRoad: number;
+
+  @ApiProperty({
+    description: "Count order",
+    example: 50,
+  })
+  total: number;
+
+  @ApiProperty({
+    description: "Count order on page",
+    example: 10,
+  })
+  to: number;
+}

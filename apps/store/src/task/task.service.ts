@@ -14,8 +14,10 @@ export class TasksService {
   async handleHandlePayment() {
     this.logger.debug("Handle payment start");
     const orders = await this.orderService.findAll({
+      take: 50,
+      skip: 0,
       where: {
-        status: "success",
+        paymentStatus: "success",
       },
     });
     const promises = orders.map(async (order) => {
@@ -61,7 +63,7 @@ export class TasksService {
         transaction_id: foundExternalPayment.id,
       });
       return this.orderService.update(order.id, {
-        status: "completed",
+        paymentStatus: "completed",
       });
     });
     try {

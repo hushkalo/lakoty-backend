@@ -136,6 +136,7 @@ model Order {
   comment          String?
   isDeleted        Boolean        @default(false)
   status           String
+  paymentStatus    String         @default("no_paid")
   city             String
   warehouseAddress String
   warehouseNumber  String
