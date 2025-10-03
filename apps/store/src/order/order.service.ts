@@ -113,14 +113,14 @@ export class OrderService {
           },
         },
       });
-      const invoice =
-        data.paymentType === "PREPAY"
-          ? await this.createInvoice({
-              data: newOrder.OrderProduct,
-              orderId: newOrder.id,
-              crmOrderId: orderFromCrm.id.toString(),
-            })
-          : undefined;
+      const invoice = undefined;
+      // data.paymentType === "PREPAY"
+      //   ? await this.createInvoice({
+      //       data: newOrder.OrderProduct,
+      //       orderId: newOrder.id,
+      //       crmOrderId: orderFromCrm.id.toString(),
+      //     })
+      //   : undefined;
 
       await this.update(newOrder.id, {
         invoiceId: invoice?.invoiceId,
@@ -298,7 +298,7 @@ export class OrderService {
         {
           payment_method_id:
             data.paymentType === "PREPAY"
-              ? this.configService.get("PREPAY_ID")
+              ? this.configService.get("POSTPAY_ID")
               : this.configService.get("POSTPAY_ID"),
           payment_method:
             data.paymentType === "PREPAY"
