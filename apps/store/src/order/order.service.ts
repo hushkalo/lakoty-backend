@@ -269,7 +269,7 @@ export class OrderService {
         email: data.messengerType === "EMAIL" ? data.messenger : null,
       },
       shipping: {
-        delivery_service_id: 3,
+        delivery_service_id: 19,
         shipping_service: "Нова Пошта",
         shipping_address_city: data.city,
         shipping_address_country: "Ukraine",
