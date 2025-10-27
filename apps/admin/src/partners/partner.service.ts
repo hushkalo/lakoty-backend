@@ -210,7 +210,6 @@ export class PartnerService {
       }
 
       const sizes = await this.getProductSizes(product.id, apiUrl, apiKey);
-
       await this.prisma.product.create({
         data: {
           name: product.name,

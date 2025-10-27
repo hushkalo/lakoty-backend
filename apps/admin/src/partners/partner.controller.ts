@@ -21,6 +21,8 @@ import { CreatePartnerDto } from "./dto/create-partner.dto";
 import { JwtGuard } from "../guards/jwt.guard";
 import { UpdatePartnerDto } from "./dto/update-partner.dto";
 import { UploadProductsResponseDto } from "./dto/upload-products-response.dto";
+import { PartnerDto } from "./dto/partner.dto";
+import { ResponseAllPartnerDto } from "./dto/response.dto";
 
 @ApiTags("partners")
 @Controller("partners")
@@ -55,7 +57,11 @@ export class PartnerController {
     enum: ["asc", "desc"],
     description: "Sort order",
   })
-  @ApiResponse({ status: 200, description: "List of partners" })
+  @ApiResponse({
+    status: 200,
+    description: "List of partners",
+    type: ResponseAllPartnerDto,
+  })
   findAll(
     @Query("skip") skip: string,
     @Query("take") take: string,
@@ -65,7 +71,7 @@ export class PartnerController {
       skip: skip ? parseInt(skip) : undefined,
       take: take ? parseInt(take) : undefined,
       orderBy: {
-        createdAt: orderBy || "asc",
+        createdAt: orderBy || "desc",
       },
     });
   }
@@ -74,7 +80,7 @@ export class PartnerController {
   @Get(":id")
   @ApiOperation({ summary: "Get partner by ID" })
   @ApiParam({ name: "id", description: "Partner ID" })
-  @ApiResponse({ status: 200, description: "Partner found" })
+  @ApiResponse({ status: 200, description: "Partner found", type: PartnerDto })
   @ApiResponse({ status: 404, description: "Partner not found" })
   findOne(@Param("id") id: string) {
     return this.partnerService.findOne({
