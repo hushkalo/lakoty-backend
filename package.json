@@ -17,13 +17,14 @@
     "start:prod:store": "node dist/apps/store/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "prisma:generate": "prisma generate --schema=libs/prisma-schema/prisma/schema.prisma",
-    "prisma:migrate": "dotenv -e apps/admin/.env.development -- prisma migrate dev --schema=libs/prisma-schema/prisma/schema.prisma",
+    "prisma:migrate": "dotenv -e apps/admin/.env -- prisma migrate dev --schema=libs/prisma-schema/prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=libs/prisma-schema/prisma/schema.prisma",
-    "prisma:seed": "dotenv -e apps/admin/.env.development -- prisma db seed"
+    "prisma:seed": "dotenv -e apps/admin/.env -- prisma db seed"
   },
   "dependencies": {
     "@eslint/js": "^9.22.0",
     "@nestjs/axios": "^4.0.0",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.7",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.7",
@@ -36,6 +37,7 @@
     "@nestjs/throttler": "^6.4.0",
     "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
+    "bullmq": "^5.61.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
@@ -69,7 +71,7 @@
     "@nx/node": "20.8.0",
     "@nx/web": "20.8.0",
     "@nx/webpack": "20.8.0",
-    "@prisma/client": "^6.10.1",
+    "@prisma/client": "^6.17.1",
     "@swc-node/register": "~1.9.1",
     "@swc/core": "~1.5.7",
     "@swc/helpers": "~0.5.11",

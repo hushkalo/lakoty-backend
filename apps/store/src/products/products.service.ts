@@ -32,6 +32,7 @@ export class ProductsService {
 
     const products = await this.prisma.product.findMany({
       ...params,
+      distinct: ["id"],
       include: {
         images: {
           select: {
@@ -51,9 +52,11 @@ export class ProductsService {
           },
         },
         category: true,
+        Brand: true,
       },
       omit: {
         createdAt: true,
+        partnersId: true,
       },
     });
     const total = await this.countProducts({
@@ -102,12 +105,15 @@ export class ProductsService {
           },
         },
         category: true,
+        Brand: true,
       },
       omit: {
         categoryId: true,
         createdAt: true,
         keyCrmId: true,
         quantity: true,
+        partnersId: true,
+        brandsId: true,
       },
     });
   }
@@ -147,8 +153,11 @@ export class ProductsService {
           },
         },
         category: true,
+        Brand: true,
+        Partner: true,
       },
       omit: {
+        partnersId: true,
         createdAt: true,
       },
     });
@@ -156,12 +165,25 @@ export class ProductsService {
     if (!product) {
       return null;
     }
+
+    const { Partner, ...rest } = product;
+
+    const result = {
+      ...rest,
+      contacts: {
+        instagram: Partner.instagram,
+        telegram: Partner.telegram,
+        phone: Partner.phone,
+      },
+    };
+
     await this.redisService.set(
       `products/findOne?${JSON.stringify(params)}`,
-      product,
+      result,
       60,
     );
-    return product;
+
+    return result;
   }
 
   async getSizeByCategoryAlias(
@@ -238,5 +260,26 @@ export class ProductsService {
     );
 
     return response;
+  }
+
+  update(productId: string, data: Prisma.ProductUpdateInput) {
+    return this.prisma.product.update({ where: { id: productId }, data });
+  }
+
+  async updateSize(keyCrmId: number, data: Prisma.ProductSizeUpdateInput) {
+    const size = await this.prisma.productSize.findFirst({
+      where: {
+        keyCrmId: keyCrmId,
+      },
+    });
+
+    if (!size) {
+      return null;
+    }
+
+    return this.prisma.productSize.update({
+      where: { id: size.id },
+      data,
+    });
   }
 }

@@ -1,4 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
+import { BrandDto } from "../../brands/dto/brand.dto";
 import { CategoryDto } from "../../categories/dto/category.dto";
 
 export class ProductImageDto {
@@ -7,6 +8,29 @@ export class ProductImageDto {
     example: "https://example.com/image.jpg",
   })
   url: string;
+}
+
+export class ContactDto {
+  @ApiProperty({
+    example: "@brand",
+    nullable: true,
+    description: "Instagram handle",
+  })
+  instagram?: string | null;
+
+  @ApiProperty({
+    example: "@user",
+    nullable: true,
+    description: "Telegram handle",
+  })
+  telegram?: string | null;
+
+  @ApiProperty({
+    example: "+1234567890",
+    nullable: true,
+    description: "Contact phone number",
+  })
+  phone?: string | null;
 }
 
 export class ProductSizeDto {
@@ -84,6 +108,12 @@ export class ProductDto {
   quantity: number;
 
   @ApiProperty({
+    description: "Brand ID",
+    nullable: true,
+  })
+  brandsId: string | null;
+
+  @ApiProperty({
     nullable: true,
     description: "External CRM system identifier",
     example: 12345,
@@ -120,6 +150,12 @@ export class ProductDto {
   category: CategoryDto;
 
   @ApiProperty({
+    description: "Object containing brand details",
+    type: BrandDto,
+  })
+  Brand: BrandDto;
+
+  @ApiProperty({
     description: "Is novelty product?",
   })
   isNovelty: boolean;
@@ -140,6 +176,13 @@ export class ProductDto {
   productSizes: ProductSizeDto[];
 
   @ApiProperty({
+    description: "Contact handles for the product",
+    type: ContactDto,
+    nullable: true,
+  })
+  contacts?: ContactDto | null;
+
+  @ApiProperty({
     description: "Last update product",
     example: "2023-10-01T12:00:00Z",
   })
@@ -151,4 +194,5 @@ export class RecommendationProductDto extends OmitType(ProductDto, [
   "keyCrmId",
   "quantity",
   "productSizes",
+  "brandsId",
 ]) {}

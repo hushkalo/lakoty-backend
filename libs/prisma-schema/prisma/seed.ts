@@ -367,8 +367,148 @@ async function seedUsers() {
   }
 }
 
+async function seedBrands() {
+  const brands = [
+    {
+      name: "common",
+      imageUrl: null,
+    },
+    {
+      name: "Stone Island",
+      imageUrl: null,
+    },
+    {
+      name: "C.P. Company",
+      imageUrl: null,
+    },
+    {
+      name: "Prada",
+      imageUrl: null,
+    },
+    {
+      name: "Gucci",
+      imageUrl: null,
+    },
+    {
+      name: "New Balance",
+      imageUrl: null,
+    },
+    {
+      name: "Nike",
+      imageUrl: null,
+    },
+    {
+      name: "Adidas",
+      imageUrl: null,
+    },
+    {
+      name: "Balenciaga",
+      imageUrl: null,
+    },
+    {
+      name: "Louis Vuitton",
+      imageUrl: null,
+    },
+    {
+      name: "Supreme",
+      imageUrl: null,
+    },
+    {
+      name: "Burberry",
+      imageUrl: null,
+    },
+    {
+      name: "Moncler",
+      imageUrl: null,
+    },
+    {
+      name: "Ralph Lauren",
+      imageUrl: null,
+    },
+    {
+      name: "Versace",
+      imageUrl: null,
+    },
+    {
+      name: "Armani",
+      imageUrl: null,
+    },
+    {
+      name: "Polar Big Boy",
+      imageUrl: null,
+    },
+    {
+      name: "EVISU",
+      imageUrl: null,
+    },
+    {
+      name: "Cangol",
+      imageUrl: null,
+    },
+    {
+      name: "ACNE STUDIO",
+      imageUrl: null,
+    },
+    {
+      name: "POLO BEAR",
+      imageUrl: null,
+    },
+    {
+      name: "The North Face",
+      imageUrl: null,
+    },
+    {
+      name: "Apple",
+      imageUrl: null,
+    },
+    {
+      name: "Maison Margiela",
+      imageUrl: null,
+    },
+    {
+      name: "STUSSY",
+      imageUrl: null,
+    },
+    {
+      name: "LORO PIANO",
+      imageUrl: null,
+    },
+    {
+      name: "Chrome Hearts",
+      imageUrl: null,
+    },
+    {
+      name: "VIVIENNE",
+      imageUrl: null,
+    },
+    {
+      name: "Arcteryx",
+      imageUrl: null,
+    },
+  ];
+
+  for (const brand of brands) {
+    const isExists = await prisma.brands.findUnique({
+      where: {
+        name: brand.name,
+      },
+    });
+
+    if (isExists) {
+      console.log(`Brand ${brand.name} already exists`);
+      continue;
+    }
+
+    console.log(`Brand ${brand.name} already created`);
+    await prisma.brands.create({
+      data: brand,
+    });
+  }
+}
+
 async function main() {
   await seedCategories();
+  await seedBrands();
   await seedProducts();
   await seedRoles();
   await seedUsers();

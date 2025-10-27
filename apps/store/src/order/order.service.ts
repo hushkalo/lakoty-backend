@@ -7,7 +7,7 @@ import {
   MyOrdersDto,
   RetryOrderResponseDto,
 } from "./dto/responses.dto";
-import { Prisma, PrismaService } from "@libs/prisma-client";
+import { Prisma, PrismaService, Partners } from "@libs/prisma-client";
 import { EnvironmentVariablesForStore } from "@shared/configuration";
 import { ConfigService } from "@nestjs/config";
 import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
@@ -19,6 +19,13 @@ import { OrderStatusDto } from "./dto/order-status.dto";
 import { CallbackRequestBodyDto } from "./dto/callback.dto";
 import { StatusEnum } from "./enum/status.enum";
 import { RedisService } from "../redis/redis.service";
+import {
+  ProductWithPartner,
+  OrderProductWithData,
+  PartnerWithProducts,
+  CrmOrderResponse,
+  CrmOrderDetails,
+} from "./dto/partner-types.dto";
 
 @Injectable()
 export class OrderService {
@@ -69,7 +76,31 @@ export class OrderService {
 
     const { data } = params;
     try {
-      const orderFromCrm = await this.createOrderInCrm(data);
+      // Получаем информацию о продуктах с партнерами
+      const productsWithPartners = await this.getProductsWithPartners(
+        data.orderProducts,
+      );
+
+      // Группируем продукты по партнерам
+      const productsByPartner = this.groupProductsByPartner(
+        productsWithPartners,
+        data.orderProducts,
+      );
+
+      // Создаем заказы в CRM для каждого партнера
+      const crmOrders = await this.createOrdersInCrmByPartners(
+        data,
+        productsByPartner,
+      );
+
+      // Выбираем основной заказ (первый) для сохранения в нашей базе
+      const mainCrmOrder = crmOrders[0];
+
+      // Получаем все остальные ID заказов CRM для additionalKeyCrmIds
+      const additionalCrmOrderIds = crmOrders
+        .slice(1)
+        .map((order) => order.id.toString());
+
       const newOrder = await this.prisma.order.create({
         data: {
           firstName: data.firstName,
@@ -80,7 +111,8 @@ export class OrderService {
           messengerType: data.messengerType,
           callCustomer: data.callCustomer,
           comment: data.comment,
-          keyCrmOrderId: orderFromCrm.id,
+          keyCrmOrderId: mainCrmOrder.id,
+          additionalKeyCrmIds: additionalCrmOrderIds,
           status: "created",
           city: data.city,
           warehouseAddress: data.warehouseAddress,
@@ -106,6 +138,7 @@ export class OrderService {
                   name: true,
                   alias: true,
                   images: true,
+                  partnersId: true,
                 },
               },
               ProductSize: true,
@@ -118,7 +151,7 @@ export class OrderService {
       //   ? await this.createInvoice({
       //       data: newOrder.OrderProduct,
       //       orderId: newOrder.id,
-      //       crmOrderId: orderFromCrm.id.toString(),
+      //       crmOrderId: mainCrmOrder.id.toString(),
       //     })
       //   : undefined;
 
@@ -147,6 +180,7 @@ export class OrderService {
       };
     } catch (e) {
       console.error(e);
+
       throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
   }
@@ -167,6 +201,12 @@ export class OrderService {
     if (!order || order.paymentStatus === "canceled") {
       return null;
     }
+
+    // Получаем партнера для заказа
+    const partner = await this.getPartnerFromCrmOrder(
+      order.keyCrmOrderId.toString(),
+    );
+
     const totalSum = order.OrderProduct.reduce(
       (acc, item) =>
         acc +
@@ -174,7 +214,10 @@ export class OrderService {
           item.quantity,
       0,
     );
-    const orderFromCrm = await this.getOrderFromCrm(order.keyCrmOrderId);
+    const orderFromCrm = await this.getOrderFromCrm(
+      order.keyCrmOrderId,
+      partner,
+    );
     const notPaidPayment = orderFromCrm.payments.find((item) => {
       return item.status !== "canceled" && item.amount === totalSum;
     });
@@ -183,6 +226,7 @@ export class OrderService {
         order.keyCrmOrderId.toString(),
         totalSum,
         "not_paid",
+        partner,
       );
     }
     const newInvoice = await this.createInvoice({
@@ -213,6 +257,8 @@ export class OrderService {
                 name: true,
                 alias: true,
                 images: true,
+                partnersId: true,
+                Partner: true,
               },
             },
             ProductSize: true,
@@ -226,20 +272,103 @@ export class OrderService {
     return order;
   }
 
-  private async createOrderInCrm(data: CreateOrderDto) {
+  private async getProductsWithPartners(
+    orderProducts: CreateOrderDto["orderProducts"],
+  ): Promise<ProductWithPartner[]> {
+    const productIds = orderProducts.map((item) => item.productId);
+
+    return this.prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+      },
+      include: {
+        Partner: true,
+      },
+    });
+  }
+
+  private groupProductsByPartner(
+    productsWithPartners: ProductWithPartner[],
+    orderProducts: CreateOrderDto["orderProducts"],
+  ): Map<string, PartnerWithProducts> {
+    const productsByPartner = new Map<string, PartnerWithProducts>();
+
+    orderProducts.forEach((orderProduct) => {
+      const productWithPartner = productsWithPartners.find(
+        (p) => p.id === orderProduct.productId,
+      );
+
+      if (!productWithPartner || !productWithPartner.Partner) {
+        throw new Error(
+          `Product ${orderProduct.productId} has no partner assigned`,
+        );
+      }
+
+      const partnerId = productWithPartner.Partner.id;
+
+      if (!productsByPartner.has(partnerId)) {
+        productsByPartner.set(partnerId, {
+          partner: productWithPartner.Partner,
+          products: [],
+        });
+      }
+
+      const partnerGroup = productsByPartner.get(partnerId);
+      if (partnerGroup) {
+        partnerGroup.products.push({
+          ...orderProduct,
+          productData: productWithPartner,
+        });
+      }
+    });
+
+    return productsByPartner;
+  }
+
+  private async createOrdersInCrmByPartners(
+    orderData: CreateOrderDto,
+    productsByPartner: Map<string, PartnerWithProducts>,
+  ): Promise<CrmOrderResponse[]> {
+    const crmOrders: CrmOrderResponse[] = [];
+    const isMultiPartnerOrder = productsByPartner.size > 1;
+    const orderType = isMultiPartnerOrder
+      ? "Об'єднане замовлення"
+      : "Єдине замовлення";
+
+    for (const [, { partner, products }] of productsByPartner) {
+      const crmOrder = await this.createOrderInCrmForPartner(
+        orderData,
+        products,
+        partner,
+        orderType,
+      );
+      crmOrders.push(crmOrder);
+    }
+
+    return crmOrders;
+  }
+
+  private async createOrderInCrmForPartner(
+    data: CreateOrderDto,
+    products: OrderProductWithData[],
+    partner: Partners,
+    orderType: string,
+  ): Promise<CrmOrderResponse> {
     const typeMessenger = {
       TELEGRAM: "Телеграм",
       VIBER: "Viber",
       WHATSAPP: "WhatsApp",
       INSTAGRAM: "Instagram",
     };
-    const totalSum = data.orderProducts.reduce(
+
+    const totalSum = products.reduce(
       (acc, item) =>
         acc +
         Math.round(item.price - (item.price * item.discount) / 100) *
           item.quantity,
       0,
     );
+
     const messageMessenger =
       data.messengerType !== "EMAIL"
         ? `${typeMessenger[data.messengerType]}: ${data.messenger}`
@@ -252,14 +381,17 @@ export class OrderService {
       ? "Телефонувати клієнту"
       : "Не телефонувати клієнту";
     const userComment = data.comment ? `Коментар клієнта: ${data.comment}` : "";
+    const orderTypeMessage = `Тип заказу: ${orderType}`;
+
     const bodyOrder = {
-      source_id: 20,
-      manager_id: Number(this.configService.get("MANAGER_ID")),
+      source_id: partner.sourceId,
+      manager_id: partner.managerId,
       buyer_comment: [
         messageMessenger,
         messagePayment,
         messageCall,
         userComment,
+        orderTypeMessage,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -269,7 +401,7 @@ export class OrderService {
         email: data.messengerType === "EMAIL" ? data.messenger : null,
       },
       shipping: {
-        delivery_service_id: 19,
+        delivery_service_id: partner.deliveryServiceId,
         shipping_service: "Нова Пошта",
         shipping_address_city: data.city,
         shipping_address_country: "Ukraine",
@@ -279,7 +411,7 @@ export class OrderService {
         recipient_phone: data.phoneNumber,
         warehouse_ref: data.warehouseRef,
       },
-      products: data.orderProducts.map((item) => ({
+      products: products.map((item) => ({
         sku: item?.size?.sku ? item.size.sku : item.sku,
         price: item.price,
         discount_percent: item.discount,
@@ -298,8 +430,8 @@ export class OrderService {
         {
           payment_method_id:
             data.paymentType === "PREPAY"
-              ? this.configService.get("POSTPAY_ID")
-              : this.configService.get("POSTPAY_ID"),
+              ? partner.prePayId
+              : partner.postPayId,
           payment_method:
             data.paymentType === "PREPAY"
               ? "Передоплата"
@@ -310,6 +442,7 @@ export class OrderService {
         },
       ],
     };
+
     const response = await this.httpService.axiosRef.post<
       unknown,
       AxiosResponse<{
@@ -317,11 +450,12 @@ export class OrderService {
       }>,
       CreateOrderCrmDto
     >("/order", bodyOrder, {
-      baseURL: this.configService.get("CRM_API_URL"),
+      baseURL: partner.apiUrl,
       headers: {
-        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        Authorization: `Bearer ${partner.apiKey}`,
       },
     });
+
     return response.data;
   }
 
@@ -329,20 +463,26 @@ export class OrderService {
     crmOrderId: string,
     amount: number,
     status: "not_paid" | "paid",
+    partner?: Partners,
   ): Promise<void> {
+    // Если партнер не передан, получаем его из заказа
+    if (!partner) {
+      partner = await this.getPartnerFromCrmOrder(crmOrderId);
+    }
+
     await this.httpService.axiosRef.post(
       `/order/${crmOrderId}/payment`,
       {
-        payment_method_id: this.configService.get("PREPAY_ID"),
+        payment_method_id: partner.prePayId,
         payment_method: "Передоплата",
         amount,
         description: "",
         status,
       },
       {
-        baseURL: this.configService.get("CRM_API_URL"),
+        baseURL: partner.apiUrl,
         headers: {
-          Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+          Authorization: `Bearer ${partner.apiKey}`,
         },
       },
     );
@@ -398,20 +538,47 @@ export class OrderService {
     return response.data;
   }
 
-  async getOrderFromCrm(crmOrderId: number) {
-    const orderFromCrm = await this.httpService.axiosRef.get<{
-      id: number;
-      payments: {
-        id: number;
-        status: string;
-        amount: number;
-      }[];
-    }>(`order/${crmOrderId}?include=payments`, {
-      baseURL: this.configService.get("CRM_API_URL"),
-      headers: {
-        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+  private async getPartnerFromCrmOrder(crmOrderId: string): Promise<Partners> {
+    const order = await this.prisma.order.findUnique({
+      where: { keyCrmOrderId: Number(crmOrderId) },
+      include: {
+        OrderProduct: {
+          include: {
+            Product: {
+              include: {
+                Partner: true,
+              },
+            },
+          },
+        },
       },
     });
+
+    if (!order || !order.OrderProduct[0]?.Product?.Partner) {
+      throw new Error(`Partner not found for CRM order ${crmOrderId}`);
+    }
+
+    return order.OrderProduct[0].Product.Partner;
+  }
+
+  async getOrderFromCrm(
+    crmOrderId: number,
+    partner?: Partners,
+  ): Promise<CrmOrderDetails> {
+    // Если партнер не передан, получаем его
+    if (!partner) {
+      partner = await this.getPartnerFromCrmOrder(crmOrderId.toString());
+    }
+
+    const orderFromCrm = await this.httpService.axiosRef.get<CrmOrderDetails>(
+      `order/${crmOrderId}?include=payments`,
+      {
+        baseURL: partner.apiUrl,
+        headers: {
+          Authorization: `Bearer ${partner.apiKey}`,
+        },
+      },
+    );
     return orderFromCrm.data;
   }
 
@@ -442,7 +609,15 @@ export class OrderService {
           },
         });
       }
-      const orderFromCrm = await this.getOrderFromCrm(order.keyCrmOrderId);
+      // Получаем партнера для заказа
+      const partner = await this.getPartnerFromCrmOrder(
+        order.keyCrmOrderId.toString(),
+      );
+
+      const orderFromCrm = await this.getOrderFromCrm(
+        order.keyCrmOrderId,
+        partner,
+      );
       const notPaidPayment = orderFromCrm.payments.find(
         (item) =>
           item.status !== "canceled" && item.amount === data.amount / 100,
@@ -453,6 +628,7 @@ export class OrderService {
             orderFromCrm.id.toString(),
             data.amount / 100,
             "not_paid",
+            partner,
           );
         }
         return this.prisma.order.update({
@@ -471,9 +647,9 @@ export class OrderService {
             status: "canceled",
           },
           {
-            baseURL: this.configService.get("CRM_API_URL"),
+            baseURL: partner.apiUrl,
             headers: {
-              Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+              Authorization: `Bearer ${partner.apiKey}`,
             },
           },
         );
@@ -493,8 +669,17 @@ export class OrderService {
     }
   }
 
-  async getExternalPayment(params: { from: string; to: string }) {
-    const { from, to } = params;
+  async getExternalPayment(params: {
+    from: string;
+    to: string;
+    partner?: Partners;
+  }) {
+    const { from, to, partner } = params;
+
+    // Если партнер не передан, используем конфигурацию по умолчанию (для совместимости)
+    const apiUrl = partner?.apiUrl || this.configService.get("CRM_API_URL");
+    const apiKey = partner?.apiKey || this.configService.get("CRM_API_KEY");
+
     const externalPayment = await this.httpService.axiosRef.get<{
       data: {
         id: number;
@@ -505,9 +690,9 @@ export class OrderService {
         currency: string;
       }[];
     }>(`payments/external-transactions?filter[created_between]=${from},${to}`, {
-      baseURL: this.configService.get("CRM_API_URL"),
+      baseURL: apiUrl,
       headers: {
-        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        Authorization: `Bearer ${apiKey}`,
       },
     });
     return externalPayment.data.data;
@@ -519,7 +704,12 @@ export class OrderService {
       transaction_id: number;
       transaction_uuid: number;
     },
+    partner?: Partners,
   ) {
+    // Если партнер не передан, используем конфигурацию по умолчанию (для совместимости)
+    const apiUrl = partner?.apiUrl || this.configService.get("CRM_API_URL");
+    const apiKey = partner?.apiKey || this.configService.get("CRM_API_KEY");
+
     await this.httpService.axiosRef.post<
       unknown,
       unknown,
@@ -528,9 +718,9 @@ export class OrderService {
         transaction_uuid: number;
       }
     >(`/payments/${paymentId}/external-transactions`, data, {
-      baseURL: this.configService.get("CRM_API_URL"),
+      baseURL: apiUrl,
       headers: {
-        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        Authorization: `Bearer ${apiKey}`,
       },
     });
     return "OK";
@@ -538,12 +728,16 @@ export class OrderService {
 
   async changeStatusOrder(data: CallbackRequestBodyDto) {
     const { context } = data;
+
+    // Получаем партнера для заказа
+    const partner = await this.getPartnerFromCrmOrder(context.id.toString());
+
     const statusOrder = await this.httpService.axiosRef.get<{
       data: OrderStatusDto[];
     }>(`/order/status`, {
-      baseURL: this.configService.get("CRM_API_URL"),
+      baseURL: partner.apiUrl,
       headers: {
-        Authorization: `Bearer ${this.configService.get("CRM_API_KEY")}`,
+        Authorization: `Bearer ${partner.apiKey}`,
       },
     });
 

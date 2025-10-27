@@ -13,4 +13,6 @@ export {
   OrderProduct,
   ServerStatus,
   Role,
+  Brands,
+  Partners,
 } from "./generated/client";

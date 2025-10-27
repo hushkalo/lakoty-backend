@@ -113,6 +113,18 @@ export class ProductsController {
     type: String,
     description: "Filter products by maximum price",
   })
+  @ApiQuery({
+    name: "filter[brand_name]",
+    required: false,
+    type: String,
+    description: "Filter products by brand name",
+  })
+  @ApiQuery({
+    name: "parentCategoryWithProduct",
+    required: false,
+    type: String,
+    description: "Parent category's products",
+  })
   @ApiResponse({
     status: 200,
     description: "List of products",
@@ -141,7 +153,9 @@ export class ProductsController {
       category_id?: string;
       min_price?: number;
       max_price?: number;
+      brand_name?: string;
     },
+    @Query("parentCategoryWithProduct") parentCategoryWithProduct?: string,
   ): Promise<ProductsResponseDto> {
     return this.productsService.findAll({
       take: Number(take) || 12,
@@ -153,6 +167,11 @@ export class ProductsController {
         },
         isDeleted: false,
         hidden: false,
+        Brand: filter?.brand_name && {
+          name: {
+            in: filter.brand_name.split(","),
+          },
+        },
         productSizes: filter?.size_name && {
           some: {
             name: {
@@ -169,15 +188,21 @@ export class ProductsController {
         category: {
           id: categoryAlias
             ? undefined
-            : categoryId || filter?.category_id
-              ? {
-                  in: [categoryId, filter?.category_id?.split(",")]
-                    .filter(Boolean)
-                    .flat(),
-                }
-              : undefined,
+            : parentCategoryWithProduct === "true"
+              ? parentCategoryId
+              : categoryId || filter?.category_id
+                ? {
+                    in: [categoryId, filter?.category_id?.split(",")]
+                      .filter(Boolean)
+                      .flat(),
+                  }
+                : undefined,
           alias: categoryAlias || undefined,
-          parentCategoryId: categoryAlias ? undefined : parentCategoryId,
+          parentCategoryId: categoryAlias
+            ? undefined
+            : parentCategoryWithProduct === "true"
+              ? undefined
+              : parentCategoryId,
         },
         discount: sale ? { gt: 1 } : undefined,
         isNovelty: novelty === "true" ? true : undefined,

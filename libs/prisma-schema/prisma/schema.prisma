@@ -46,6 +46,8 @@ model Product {
   sku          String?
   category     Category       @relation(fields: [categoryId], references: [id])
   quantity     Int            @default(0)
+  partnersId   String?
+  brandsId     String?
   keyCrmId     Int?
   hidden       Boolean        @default(false)
   salesCount   Int            @default(0)
@@ -57,6 +59,8 @@ model Product {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
+  Brand        Brands?        @relation(fields: [brandsId], references: [id])
+  Partner      Partners?      @relation(fields: [partnersId], references: [id])
   OrderProduct OrderProduct[]
 }
 
@@ -123,27 +127,28 @@ model Role {
 }
 
 model Order {
-  id               String         @id @default(cuid())
-  firstName        String
-  secondName       String
-  patronymic       String
-  phoneNumber      String
-  paymentType      String
-  messengerType    String
-  keyCrmOrderId    Int            @unique
-  invoiceId        String?
-  callCustomer     Boolean        @default(false)
-  comment          String?
-  isDeleted        Boolean        @default(false)
-  status           String
-  paymentStatus    String         @default("no_paid")
-  city             String
-  warehouseAddress String
-  warehouseNumber  String
-  warehouseType    String
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  OrderProduct     OrderProduct[]
+  id                  String         @id @default(cuid())
+  firstName           String
+  secondName          String
+  patronymic          String
+  phoneNumber         String
+  paymentType         String
+  messengerType       String
+  keyCrmOrderId       Int            @unique
+  invoiceId           String?
+  callCustomer        Boolean        @default(false)
+  comment             String?
+  isDeleted           Boolean        @default(false)
+  status              String
+  paymentStatus       String         @default("no_paid")
+  city                String
+  warehouseAddress    String
+  warehouseNumber     String
+  warehouseType       String
+  additionalKeyCrmIds String[]       @default([])
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  OrderProduct        OrderProduct[]
 }
 
 model OrderProduct {
@@ -159,4 +164,32 @@ model OrderProduct {
   Product     Product      @relation(fields: [productId], references: [id])
   ProductSize ProductSize? @relation(fields: [sizeId], references: [id])
   Order       Order        @relation(fields: [orderId], references: [id])
+}
+
+model Brands {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  imageUrl  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+}
+
+model Partners {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  apiKey            String    @unique
+  apiUrl            String
+  isUpdate          Boolean   @default(true)
+  managerId         Int
+  sourceId          Int
+  postPayId         Int
+  prePayId          Int
+  deliveryServiceId Int
+  instagram         String?
+  telegram          String?
+  phone             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  Product           Product[]
 }

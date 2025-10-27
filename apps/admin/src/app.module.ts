@@ -9,6 +9,7 @@ import { UserModule } from "./user/user.module";
 import { AuthModule } from "./auth/auth.module";
 import { validate, configuration } from "@shared/configuration";
 import { NovaPostModule } from "./nova-post/nova-post.module";
+import { PartnerModule } from "./partners/partner.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { NovaPostModule } from "./nova-post/nova-post.module";
     UserModule,
     AuthModule,
     NovaPostModule,
+    PartnerModule,
   ],
   providers: [],
 })

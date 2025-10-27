@@ -2,10 +2,13 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { OrderService } from "../order/order.service";
 import { DateTime } from "luxon";
+import { PartnerService } from "../partners/partner.service";
+
 @Injectable()
 export class TasksService {
   constructor(
     private readonly orderService: OrderService,
+    private readonly partnerService: PartnerService,
     private readonly logger: Logger,
   ) {}
   SERVICE_NAME = "task";
@@ -72,5 +75,26 @@ export class TasksService {
       this.logger.error(error.message, error, this.SERVICE_NAME);
     }
     this.logger.debug("Handle payment end");
+  }
+
+  @Cron(CronExpression.EVERY_30_MINUTES)
+  async handleUpdateQuantity() {
+    this.logger.debug("Update partner quantity");
+    const partners = await this.partnerService.findAll({
+      where: {
+        isUpdate: true,
+      },
+    });
+
+    const promises = partners.map(async (partner) => {
+      const result = await this.partnerService.uploadPartnerProducts(
+        partner.id,
+      );
+      this.logger.log(partner.name, JSON.stringify(result));
+      return result;
+    });
+
+    await Promise.all(promises);
+    this.logger.debug("END Update partner quantity");
   }
 }
