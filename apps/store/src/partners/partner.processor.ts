@@ -42,7 +42,7 @@ export class PartnerProcessor extends WorkerHost {
 
         await this.productsService.update(product.id, {
           quantity: crmProduct.quantity,
-          hidden: crmProduct.quantity === 0 || crmProduct.is_archived,
+          hidden: crmProduct.quantity === 0 ? false : crmProduct.is_archived,
         });
 
         const sizes = await this.partnerService.getProductSizes(
@@ -54,7 +54,7 @@ export class PartnerProcessor extends WorkerHost {
         const promises = sizes.map(async (size) => {
           return this.productsService.updateSize(size.keyCrmId, {
             quantity: size.quantity,
-            isAvailable: size.quantity === 0 || size.isAvailable,
+            isAvailable: size.quantity === 0 ? false : size.isAvailable,
           });
         });
 
