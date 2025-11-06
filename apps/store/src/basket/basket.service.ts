@@ -22,7 +22,7 @@ export class BasketService {
   }
 
   async setBasket(sessionId: string, items: BasketItemDto[]) {
-    await this.redis.set(this.getKey(sessionId), items, 60 * 60 * 24);
+    await this.redis.set(this.getKey(sessionId), items, 3 * 60 * 60);
   }
 
   async clearBasket(sessionId: string): Promise<void> {
