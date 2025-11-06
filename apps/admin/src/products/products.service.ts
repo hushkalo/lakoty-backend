@@ -348,11 +348,29 @@ export class ProductsService {
     }
   }
 
-  async getProductFromCrm(params: { id: number }): Promise<CrmProductDto> {
+  async getProductFromCrm(params: { id: string }): Promise<CrmProductDto> {
     try {
+      const product = await this.prisma.product.findUnique({
+        where: { id: params.id },
+      });
+
+      if (!product) {
+        throw new NotFoundException(ErrorModel.INTERNAL_SERVER_ERROR);
+      }
+
+      const partner = await this.prisma.partners.findUnique({
+        where: { id: product.partnersId },
+      });
+
       const { data } = await this.httpService.axiosRef.get<CrmProductDto>(
-        `/products/${params.id}`,
+        `${partner.apiUrl}/products/${product.keyCrmId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${partner.apiKey}`,
+          },
+        },
       );
+
       return data;
     } catch (error) {
       this.logger.error(
@@ -360,6 +378,11 @@ export class ProductsService {
         error,
         this.SERVICE_NAME,
       );
+
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
       if (error.response?.status === 404) {
         throw new NotFoundException(ErrorModel.PRODUCT_NOT_FOUND_IN_CRM);
       }

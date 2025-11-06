@@ -370,7 +370,7 @@ export class ProductsController {
     example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
   @Get("keycrm/:id")
-  getProductFromCrm(@Param("id") id: number): Promise<CrmProductDto> {
+  getProductFromCrm(@Param("id") id: string): Promise<CrmProductDto> {
     return this.productsService.getProductFromCrm({ id });
   }
 
