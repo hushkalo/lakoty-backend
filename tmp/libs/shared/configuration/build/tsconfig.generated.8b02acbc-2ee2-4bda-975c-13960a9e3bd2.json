@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@libs/prisma-client": [
+        "libs/prisma-client/src/index.ts"
+      ],
+      "@libs/prisma-schema": [
+        "libs/prisma-schema/src/index.ts"
+      ],
+      "@shared/configuration": [
+        "libs/shared/configuration/src/index.ts"
+      ],
+      "@shared/error-model": [
+        "libs/shared/error-model/src/index.ts"
+      ],
+      "@shared/logger": [
+        "dist/libs/shared/logger"
+      ],
+      "@shared/types": [
+        "libs/shared/types/src/index.ts"
+      ]
+    }
+  },
+  "extends": "../../../../../libs/shared/configuration/tsconfig.lib.json"
+}

@@ -198,11 +198,11 @@ export class PartnerService {
           where: { id: productExist.id },
           data: {
             description: product.description,
-            price: product.max_price,
+            // price: product.max_price,
             quantity: product.quantity,
             updatedAt: new Date(product.updated_at),
             sku: product.sku,
-            hidden: product.is_archived,
+            hidden: partner.isUpdate ? product.is_archived : false,
           },
         });
         updatedCount++;
