@@ -3,6 +3,7 @@ import {
   Post,
   UploadedFile,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
@@ -21,6 +22,7 @@ import {
   UploadMultipleResponseDto,
   UploadResponseDto,
 } from "./dto/response.dto";
+import { JwtGuard } from "../guards/jwt.guard";
 
 @ApiTags("Upload")
 @Controller("upload")
@@ -38,6 +40,7 @@ export class UploadController {
     type: FileUploadDto,
   })
   @Post("file")
+  @UseGuards(JwtGuard)
   @UseInterceptors(FileInterceptor("file"))
   uploadFile(
     @UploadedFile(new ValidationFileSizePipe()) file: Express.Multer.File,
@@ -56,6 +59,7 @@ export class UploadController {
     description: "Files to upload",
     type: FilesUploadDto,
   })
+  @UseGuards(JwtGuard)
   @Post("files")
   @UseInterceptors(FilesInterceptor("files"))
   uploadFiles(
