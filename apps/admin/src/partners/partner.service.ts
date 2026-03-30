@@ -174,14 +174,18 @@ export class PartnerService {
       const keyCrmCategory = responseCategories.data.data.find(
         (category) => category.id === product.category_id,
       );
-
+      
+      
+      
       const category = await this.prisma.category.findFirst({
         where: {
-          name: keyCrmCategory.name,
+          // name: keyCrmCategory?.name,
+          keyCrmId: keyCrmCategory.id
         },
       });
 
       if (!category) {
+        console.log(product.name, product.category_id);
         skippedCount++;
         continue;
       }
@@ -194,17 +198,17 @@ export class PartnerService {
       });
 
       if (productExist) {
-        await this.prisma.product.update({
-          where: { id: productExist.id },
-          data: {
-            description: product.description,
-            price: product.max_price,
-            quantity: product.quantity,
-            updatedAt: new Date(product.updated_at),
-            sku: product.sku,
-            hidden: product.is_archived,
-          },
-        });
+        // await this.prisma.product.update({
+        //   where: { id: productExist.id },
+        //   data: {
+        //     description: product.description,
+        //     // price: product.max_price,
+        //     quantity: product.quantity,
+        //     updatedAt: new Date(product.updated_at),
+        //     sku: product.sku,
+        //     hidden: partner.isUpdate ? product.is_archived : false,
+        //   },
+        // });
         updatedCount++;
         continue;
       }

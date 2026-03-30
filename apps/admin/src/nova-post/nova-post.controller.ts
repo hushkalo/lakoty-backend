@@ -1,7 +1,8 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { NovaPostService } from "./nova-post.service";
 import { FindCityResponseDto, FindWarehouseResponseDto } from "@shared/types";
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { JwtGuard } from "../guards/jwt.guard";
 
 @ApiTags("Nova Post")
 @Controller("nova-post")
@@ -21,6 +22,7 @@ export class NovaPostController {
     description: "List of cities matching search query",
     type: FindCityResponseDto,
   })
+  @UseGuards(JwtGuard)
   getCities(
     @Query("searchCityName") searchCityName: string,
   ): Promise<FindCityResponseDto> {
@@ -48,6 +50,7 @@ export class NovaPostController {
     description: "List of warehouses matching search query",
     type: FindWarehouseResponseDto,
   })
+  @UseGuards(JwtGuard)
   getWarehouses(
     @Query("searchWarehouseName") searchWarehouseName: string,
     @Query("cityRef") cityRef: string,

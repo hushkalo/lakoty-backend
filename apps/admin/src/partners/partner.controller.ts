@@ -113,7 +113,7 @@ export class PartnerController {
     });
   }
 
-  // @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard)
   @Post(":id/upload-products")
   @ApiOperation({
     summary: "Upload products from partner API",

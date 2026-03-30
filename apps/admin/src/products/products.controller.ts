@@ -369,6 +369,7 @@ export class ProductsController {
     type: AppError,
     example: ErrorModel.INTERNAL_SERVER_ERROR,
   })
+  @UseGuards(JwtGuard)
   @Get("keycrm/:id")
   getProductFromCrm(@Param("id") id: string): Promise<CrmProductDto> {
     return this.productsService.getProductFromCrm({ id });
