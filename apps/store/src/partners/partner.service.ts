@@ -132,12 +132,15 @@ export class PartnerService {
     const { apiUrl, apiKey } = partner;
 
     const response = await firstValueFrom(
-      this.httpService.get<TProduct>(`${apiUrl}/products/${productId}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+      this.httpService.get<TProduct>(
+        `${apiUrl}/products/${productId}?include=customFields`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
         },
-      }),
+      ),
     );
 
     return response.data;

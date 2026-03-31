@@ -40,7 +40,7 @@ export class PartnerProcessor extends WorkerHost {
           partner,
         );
 
-        const crmDiscountInAmount = crmProduct.custom_fields.find(
+        const crmDiscountInAmount = crmProduct?.custom_fields?.find(
           ({ uuid }) => uuid === "CT_1002",
         );
 
