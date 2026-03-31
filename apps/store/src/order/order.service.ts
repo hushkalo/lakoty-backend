@@ -146,14 +146,15 @@ export class OrderService {
           },
         },
       });
-      const invoice = undefined;
-      // data.paymentType === "PREPAY"
-      //   ? await this.createInvoice({
-      //       data: newOrder.OrderProduct,
-      //       orderId: newOrder.id,
-      //       crmOrderId: mainCrmOrder.id.toString(),
-      //     })
-      //   : undefined;
+
+      const invoice =
+        data.paymentType === "PREPAY"
+          ? await this.createInvoice({
+              data: newOrder.OrderProduct,
+              orderId: newOrder.id,
+              crmOrderId: mainCrmOrder.id.toString(),
+            })
+          : undefined;
 
       await this.update(newOrder.id, {
         invoiceId: invoice?.invoiceId,
@@ -476,7 +477,8 @@ export class OrderService {
         payment_method_id: partner.prePayId,
         payment_method: "Передоплата",
         amount,
-        description: "",
+        description:
+          "Якщо оплата не закріпилась, перевірити ФОП або написати @hushkalo в телеграм",
         status,
       },
       {
