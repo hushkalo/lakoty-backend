@@ -40,8 +40,24 @@ export class PartnerProcessor extends WorkerHost {
           partner,
         );
 
+        const crmDiscountInAmount = crmProduct.custom_fields.find(
+          ({ uuid }) => uuid === "CT_1002",
+        );
+
+        const discountAmount = crmDiscountInAmount
+          ? Number(crmDiscountInAmount.value)
+          : 0;
+
+        const discountInPercent = crmDiscountInAmount
+          ? Number(((discountAmount / crmProduct.price) * 100).toFixed(2))
+          : 0;
+
         await this.productsService.update(product.id, {
+          name: crmProduct.name,
+          price: crmProduct.price,
+          description: crmProduct.description,
           quantity: crmProduct.quantity,
+          discount: discountInPercent,
           hidden: crmProduct.quantity === 0 ? true : crmProduct.is_archived,
         });
 

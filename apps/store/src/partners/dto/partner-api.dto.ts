@@ -12,6 +12,14 @@ export type TCategory = {
   parent_id: number | null;
 };
 
+export type TCustomField = {
+  id: number;
+  uuid: string;
+  name: string;
+  type: string;
+  value: number;
+};
+
 export type TProduct = {
   id: number;
   name: string;
@@ -38,6 +46,7 @@ export type TProduct = {
   price: number;
   purchased_price: number;
   sources: any[];
+  custom_fields?: TCustomField[];
 };
 
 export type TOffer = {
