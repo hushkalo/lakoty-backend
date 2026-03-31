@@ -44,17 +44,21 @@ export class PartnerProcessor extends WorkerHost {
           ({ uuid }) => uuid === "CT_1002",
         );
 
+        const price = crmProduct?.price
+          ? crmProduct.price
+          : crmProduct.max_price;
+
         const discountAmount = crmDiscountInAmount
           ? Number(crmDiscountInAmount.value)
           : 0;
 
         const discountInPercent = crmDiscountInAmount
-          ? Number(((discountAmount / crmProduct.price) * 100).toFixed(2))
+          ? Number(((discountAmount / price) * 100).toFixed(2))
           : 0;
 
         await this.productsService.update(product.id, {
           name: crmProduct.name,
-          price: crmProduct.price,
+          price,
           description: crmProduct.description,
           quantity: crmProduct.quantity,
           discount: discountInPercent,
