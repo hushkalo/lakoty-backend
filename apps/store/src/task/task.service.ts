@@ -27,12 +27,18 @@ export class TasksService {
       const externalPayments = await this.orderService.getExternalPayment({
         from: DateTime.fromJSDate(order.createdAt)
           .toUTC()
+          .set({ minute: 0, millisecond: 0, hour: 0 })
           .toFormat("yyyy-MM-dd TT"),
-        to: DateTime.now().toUTC().toFormat("yyyy-MM-dd TT"),
+        to: DateTime.fromJSDate(order.createdAt)
+          .plus({ day: 1 })
+          .toUTC()
+          .toFormat("yyyy-MM-dd TT"),
       });
+
       const foundExternalPayment = externalPayments.find(
         (item) => item.source_uuid === order.invoiceId,
       );
+
       if (!foundExternalPayment) {
         this.logger.error(
           `External payment not found ${order.invoiceId}`,
@@ -40,6 +46,7 @@ export class TasksService {
         );
         return null;
       }
+
       const totalSum = order.OrderProduct.reduce(
         (acc, item) =>
           acc +
@@ -47,6 +54,7 @@ export class TasksService {
             item.quantity,
         0,
       );
+
       const orderFromCrm = await this.orderService.getOrderFromCrm(
         order.keyCrmOrderId,
       );

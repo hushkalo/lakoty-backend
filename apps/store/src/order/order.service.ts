@@ -691,12 +691,15 @@ export class OrderService {
         description: string;
         currency: string;
       }[];
-    }>(`payments/external-transactions?filter[created_between]=${from},${to}`, {
-      baseURL: apiUrl,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
+    }>(
+      `payments/external-transactions?filter[created_between]=${from},${to}&limit=50`,
+      {
+        baseURL: apiUrl,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       },
-    });
+    );
     return externalPayment.data.data;
   }
 
