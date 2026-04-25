@@ -126,7 +126,7 @@ export class ProductsController {
     description: "Parent category's products",
   })
   @ApiQuery({
-    name: "secondCategoryId",
+    name: "secondCategorySlug",
     required: false,
     type: String,
   })
