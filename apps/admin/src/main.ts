@@ -32,11 +32,12 @@ async function bootstrap() {
       .setTitle("Lakoty Store API")
       .setDescription("The Lakoty Store API description")
       .setVersion("0.1")
-      .addServer("http://localhost:8080")
+      .addServer("http://localhost:8081/api/admin")
       .build();
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup("/api/admin/swagger", app, document, {
-      jsonDocumentUrl: "/api/admin/swagger/json",
+    SwaggerModule.setup("swagger", app, document, {
+      useGlobalPrefix: true,
+      jsonDocumentUrl: "swagger/json",
     });
   } else {
     const origins: string[] = (await configService.get("CORS_ORIGIN")).split(

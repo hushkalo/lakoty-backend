@@ -36,32 +36,57 @@ model Category {
 }
 
 model Product {
-  id           String         @id @default(cuid())
-  name         String
-  description  String?
-  price        Float
-  discount     Float
-  top          Boolean        @default(false)
-  alias        String         @unique
-  sku          String?
-  category     Category       @relation(fields: [categoryId], references: [id])
-  quantity     Int            @default(0)
-  partnersId   String?
-  brandsId     String?
-  keyCrmId     Int?
-  hidden       Boolean        @default(false)
-  salesCount   Int            @default(0)
-  categoryId   String
-  images       ProductImage[]
-  productSizes ProductSize[]
-  isNovelty    Boolean        @default(false)
-  isDeleted    Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id               String         @id @default(cuid())
+  name             String
+  description      String?
+  price            Float
+  discount         Float
+  top              Boolean        @default(false)
+  alias            String         @unique
+  sku              String?
+  category         Category       @relation(fields: [categoryId], references: [id])
+  quantity         Int            @default(0)
+  partnersId       String?
+  brandsId         String?
+  colorId          String?
+  keyCrmId         Int?
+  hidden           Boolean        @default(false)
+  salesCount       Int            @default(0)
+  categoryId       String
+  secondCategoryId String?
+  variantGroupId   String?
+  images           ProductImage[]
+  productSizes     ProductSize[]
+  isNovelty        Boolean        @default(false)
+  isDeleted        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  Brand        Brands?        @relation(fields: [brandsId], references: [id])
-  Partner      Partners?      @relation(fields: [partnersId], references: [id])
+  Brand        Brands?              @relation(fields: [brandsId], references: [id])
+  Partner      Partners?            @relation(fields: [partnersId], references: [id])
+  color        Color?               @relation(fields: [colorId], references: [id])
+  variantGroup ProductVariantGroup? @relation(fields: [variantGroupId], references: [id])
   OrderProduct OrderProduct[]
+
+  @@index([variantGroupId])
+  @@index([colorId])
+}
+
+model ProductVariantGroup {
+  id        String    @id @default(cuid())
+  name      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Color {
+  id        String    @id @default(cuid())
+  name      String
+  hex       String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
 }
 
 model ProductSize {

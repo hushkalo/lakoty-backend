@@ -18,6 +18,16 @@ import { CrmProductOffersDto } from "./dto/crm-product-offers.dto";
 import { ErrorModel } from "@shared/error-model";
 import { AllProductsResponseDto } from "./dto/response.dto";
 import { ProductDto } from "./dto/product.dto";
+import {
+  AllColorsResponseDto,
+  CreateColorsDto,
+  CreateColorsResponseDto,
+} from "./dto/color.dto";
+import {
+  AllVariantGroupsResponseDto,
+  CreateVariantGroupDto,
+  CreateVariantGroupResponseDto,
+} from "./dto/create-variant-group.dto";
 
 @Injectable()
 export class ProductsService {
@@ -28,6 +38,296 @@ export class ProductsService {
     private readonly logger: Logger,
   ) {}
   SERVICE_NAME = ProductsService.name;
+
+  async createColors(data: CreateColorsDto): Promise<CreateColorsResponseDto> {
+    const normalizedPayload = data.colors.map((color) => ({
+      name: color.name.trim(),
+      hex: color.hex.toUpperCase(),
+    }));
+
+    const uniqueRequestKeys = new Set(
+      normalizedPayload.map(
+        (color) => `${color.name.toLowerCase()}::${color.hex}`,
+      ),
+    );
+
+    if (uniqueRequestKeys.size !== normalizedPayload.length) {
+      throw new ConflictException("Duplicate colors in request payload");
+    }
+
+    try {
+      return await this.prisma.$transaction(async (prisma) => {
+        const exists = await prisma.color.findMany({
+          where: {
+            OR: normalizedPayload.flatMap((color) => [
+              { name: color.name },
+              { hex: color.hex },
+            ]),
+          },
+        });
+
+        if (exists.length > 0) {
+          throw new ConflictException("One or more colors already exist");
+        }
+
+        const createdColors = await Promise.all(
+          normalizedPayload.map((color) =>
+            prisma.color.create({
+              data: color,
+            }),
+          ),
+        );
+
+        return {
+          data: createdColors,
+          total: createdColors.length,
+        };
+      });
+    } catch (error) {
+      this.logger.error(error.name, error, this.SERVICE_NAME);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async findAllColors(): Promise<AllColorsResponseDto> {
+    const colors = await this.prisma.color.findMany({
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return {
+      data: colors,
+    };
+  }
+
+  async createVariantGroup(
+    data: CreateVariantGroupDto,
+  ): Promise<CreateVariantGroupResponseDto> {
+    try {
+      return await this.prisma.$transaction(async (prisma) => {
+        const tx = prisma as any;
+        const uniqueProductIds = data.productIds
+          ? [...new Set(data.productIds)]
+          : [];
+
+        if (uniqueProductIds.length) {
+          const foundProducts = await prisma.product.findMany({
+            where: {
+              id: {
+                in: uniqueProductIds,
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          if (foundProducts.length !== uniqueProductIds.length) {
+            throw new NotFoundException(ErrorModel.PRODUCT_DOES_NOT_EXIST);
+          }
+        }
+
+        const group = await tx.productVariantGroup.create({
+          data: {
+            name: data.name,
+          },
+        });
+
+        if (uniqueProductIds.length) {
+          await tx.product.updateMany({
+            where: {
+              id: {
+                in: uniqueProductIds,
+              },
+            },
+            data: {
+              variantGroupId: group.id,
+            },
+          });
+        }
+
+        return {
+          id: group.id,
+          name: group.name,
+          productIds: uniqueProductIds,
+        };
+      });
+    } catch (error) {
+      this.logger.error(error.name, error, this.SERVICE_NAME);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async findAllVariantGroups(params: {
+    take?: number;
+    skip?: number;
+    searchString?: string;
+  }): Promise<AllVariantGroupsResponseDto> {
+    try {
+      const groups = await this.prisma.productVariantGroup.findMany({
+        where: {
+          name: params.searchString
+            ? {
+                contains: params.searchString,
+                mode: "insensitive",
+              }
+            : undefined,
+        },
+        take: params.take,
+        skip: params.skip,
+        include: {
+          products: {
+            select: {
+              id: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      return {
+        data: groups.map((group) => ({
+          id: group.id,
+          name: group.name,
+          productIds: group.products.map((product) => product.id),
+          createdAt: group.createdAt,
+          updatedAt: group.updatedAt,
+        })),
+        total: groups.length,
+      };
+    } catch (error) {
+      this.logger.error(error.name, error, this.SERVICE_NAME);
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async update(params: {
+    where: Prisma.ProductWhereUniqueInput;
+    data: Partial<UpdateProductDto>;
+  }): Promise<ProductDto> {
+    const existingProduct = await this.prisma.product.findUnique({
+      where: params.where,
+      select: { id: true },
+    });
+    if (!existingProduct) {
+      throw new NotFoundException(ErrorModel.PRODUCT_DOES_NOT_EXIST);
+    }
+
+    const isCategoryExist = await this.categoryService.isExist({
+      id: params.data.categoryId || "",
+    });
+    if (!isCategoryExist && params.data.categoryId) {
+      throw new NotFoundException(
+        ErrorModel.CATEGORY_NOT_FOUND(params.data.categoryId, "ID"),
+      );
+    }
+
+    if (params.data.colorId) {
+      const colorExists = await this.prisma.color.findUnique({
+        where: { id: params.data.colorId },
+        select: { id: true },
+      });
+      if (!colorExists) {
+        throw new NotFoundException("Color not found");
+      }
+    }
+
+    try {
+      return this.prisma.$transaction(async (prisma) => {
+        const {
+          images,
+          productSizes,
+          groupId,
+          variantGroupId,
+          ...rawProductData
+        } = params.data;
+        const productData = {
+          ...rawProductData,
+          variantGroupId: variantGroupId ?? groupId,
+        };
+        if (images) {
+          await prisma.product.update({
+            where: params.where,
+            data: {
+              images: {
+                deleteMany: {
+                  productId: params.where.id,
+                  id: {
+                    notIn: images
+                      .map((image) => image.id)
+                      .filter((size) => size),
+                  },
+                },
+                upsert: images.map((image) => ({
+                  where: { id: image.id || "" },
+                  update: { url: image.url, order: image.order },
+                  create: {
+                    url: image.url,
+                    order: image.order,
+                  },
+                })),
+              },
+            },
+          });
+        }
+        if (productSizes) {
+          await prisma.product.update({
+            where: params.where,
+            data: {
+              productSizes: {
+                deleteMany: {
+                  productId: params.where.id,
+                  id: {
+                    notIn: productSizes
+                      .map((size) => size.id)
+                      .filter((size) => size),
+                  },
+                },
+                upsert: productSizes.map((size) => ({
+                  where: {
+                    id: size.id || "",
+                  },
+                  update: size,
+                  create: size,
+                })),
+              },
+            },
+          });
+        }
+        return prisma.product.update({
+          data: productData,
+          where: params.where,
+          include: {
+            images: true,
+            productSizes: true,
+            category: true,
+            _count: true,
+          },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException(ErrorModel.PRODUCT_DOES_NOT_EXIST);
+      }
+      this.logger.error(this.SERVICE_NAME, error.name, error);
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
 
   async create(params: {
     data: CreateProductDto;
@@ -75,31 +375,31 @@ export class ProductsService {
             },
           },
         });
-        if (isCreateOnCrm) {
-          const { crmProduct, crmProductOffers } =
-            await this.createProductInCrm({
-              product,
-              user: params.user,
-            });
-          await this.prisma.product.update({
-            where: {
-              id: product.id,
-            },
-            data: {
-              keyCrmId: crmProduct.id,
-              productSizes: {
-                updateMany: crmProductOffers.map((offer) => ({
-                  data: {
-                    keyCrmId: offer.id,
-                  },
-                  where: {
-                    sku: offer.sku,
-                  },
-                })),
-              },
-            },
-          });
-        }
+        // if (isCreateOnCrm) {
+        //   const { crmProduct, crmProductOffers } =
+        //     await this.createProductInCrm({
+        //       product,
+        //       user: params.user,
+        //     });
+        //   await this.prisma.product.update({
+        //     where: {
+        //       id: product.id,
+        //     },
+        //     data: {
+        //       keyCrmId: crmProduct.id,
+        //       productSizes: {
+        //         updateMany: crmProductOffers.map((offer) => ({
+        //           data: {
+        //             keyCrmId: offer.id,
+        //           },
+        //           where: {
+        //             sku: offer.sku,
+        //           },
+        //         })),
+        //       },
+        //     },
+        //   });
+        // }
         return product;
       });
     } catch (error) {
@@ -260,92 +560,21 @@ export class ProductsService {
             order: "asc",
           },
         },
+        variantGroup: {
+          include: {
+            products: {
+              include: {
+                color: true,
+              },
+            },
+          },
+        },
+        color: true,
         productSizes: true,
         category: true,
         _count: true,
       },
     });
-  }
-
-  async update(params: {
-    where: Prisma.ProductWhereUniqueInput;
-    data: Partial<UpdateProductDto>;
-  }): Promise<ProductDto> {
-    const isCategoryExist = await this.categoryService.isExist({
-      id: params.data.categoryId || "",
-    });
-    if (!isCategoryExist && params.data.categoryId) {
-      throw new NotFoundException(
-        ErrorModel.CATEGORY_NOT_FOUND(params.data.categoryId, "ID"),
-      );
-    }
-    try {
-      return this.prisma.$transaction(async (prisma) => {
-        const { images, productSizes, ...productData } = params.data;
-        if (images) {
-          await prisma.product.update({
-            where: params.where,
-            data: {
-              images: {
-                deleteMany: {
-                  productId: params.where.id,
-                  id: {
-                    notIn: images
-                      .map((image) => image.id)
-                      .filter((size) => size),
-                  },
-                },
-                upsert: images.map((image) => ({
-                  where: { id: image.id || "" },
-                  update: { url: image.url, order: image.order },
-                  create: {
-                    url: image.url,
-                    order: image.order,
-                  },
-                })),
-              },
-            },
-          });
-        }
-        if (productSizes) {
-          await prisma.product.update({
-            where: params.where,
-            data: {
-              productSizes: {
-                deleteMany: {
-                  productId: params.where.id,
-                  id: {
-                    notIn: productSizes
-                      .map((size) => size.id)
-                      .filter((size) => size),
-                  },
-                },
-                upsert: productSizes.map((size) => ({
-                  where: {
-                    id: size.id || "",
-                  },
-                  update: size,
-                  create: size,
-                })),
-              },
-            },
-          });
-        }
-        return prisma.product.update({
-          data: productData,
-          where: params.where,
-          include: {
-            images: true,
-            productSizes: true,
-            category: true,
-            _count: true,
-          },
-        });
-      });
-    } catch (error) {
-      this.logger.error(this.SERVICE_NAME, error.name, error);
-      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
-    }
   }
 
   async getProductFromCrm(params: { id: string }): Promise<CrmProductDto> {

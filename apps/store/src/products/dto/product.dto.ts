@@ -50,6 +50,38 @@ export class ProductSizeDto {
   isAvailable: boolean;
 }
 
+export class ProductColorDto {
+  @ApiProperty({ example: "White" })
+  name: string;
+
+  @ApiProperty({ example: "#FFFFFF" })
+  hex: string;
+}
+
+export class VariantGroupProductDto {
+  @ApiProperty({
+    example: "classic-white-t-shirt",
+  })
+  alias: string;
+
+  @ApiProperty({ type: ProductColorDto, nullable: true })
+  color: ProductColorDto | null;
+}
+
+export class ProductVariantGroupDto {
+  @ApiProperty({
+    example: "Світер",
+    nullable: true,
+  })
+  name: string;
+
+  @ApiProperty({
+    type: [VariantGroupProductDto],
+    description: "Array of products in the variant group",
+  })
+  products: VariantGroupProductDto[];
+}
+
 export class ProductDto {
   @ApiProperty({
     description: "Unique identifier of the product",
@@ -187,6 +219,13 @@ export class ProductDto {
     example: "2023-10-01T12:00:00Z",
   })
   updatedAt: Date;
+
+  @ApiProperty({
+    description: "Variant group with sibling products by color",
+    type: ProductVariantGroupDto,
+    nullable: true,
+  })
+  variantGroup?: ProductVariantGroupDto | null;
 }
 
 export class RecommendationProductDto extends OmitType(ProductDto, [

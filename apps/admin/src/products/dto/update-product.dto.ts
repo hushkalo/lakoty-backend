@@ -13,6 +13,7 @@ import {
   IsOptional,
 } from "class-validator";
 import { CreateProductImage, CreateProductSize } from "./create-product.dto";
+import { IsCUID } from "../../validations/is-cuid.validation";
 
 export class UpdateProductImage extends CreateProductImage {
   @ApiProperty({
@@ -155,4 +156,38 @@ export class UpdateProductDto {
   @ArrayMinSize(1)
   @Type(() => UpdateProductSize)
   productSizes: UpdateProductSize[];
+
+  @ApiProperty({
+    description: "Variant group ID used to link products by color",
+    example: "cmf5r3n4x0001vyl9f2h3k7ab",
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @IsCUID()
+  variantGroupId?: string;
+
+  @ApiProperty({
+    description:
+      "Alias for variantGroupId. Use this to attach product to an existing group via update.",
+    example: "cmf5r3n4x0001vyl9f2h3k7ab",
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @IsCUID()
+  groupId?: string;
+
+  @ApiProperty({
+    description: "Color ID to assign to this product. Pass null to remove color.",
+    example: "cmf5r5u1x0004vyl95m2a9pqr",
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @IsCUID()
+  colorId?: string | null;
 }

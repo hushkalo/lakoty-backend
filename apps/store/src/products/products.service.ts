@@ -155,6 +155,37 @@ export class ProductsService {
         category: true,
         Brand: true,
         Partner: true,
+        variantGroup: {
+          include: {
+            products: {
+              include: {
+                color: true,
+              },
+              omit: {
+                id: true,
+                name: true,
+                sku: true,
+                quantity: true,
+                description: true,
+                createdAt: true,
+                brandsId: true,
+                categoryId: true,
+                discount: true,
+                hidden: true,
+                isDeleted: true,
+                isNovelty: true,
+                keyCrmId: true,
+                partnersId: true,
+                price: true,
+                salesCount: true,
+                secondCategoryId: true,
+                top: true,
+                variantGroupId: true,
+                updatedAt: true,
+              },
+            },
+          },
+        },
       },
       omit: {
         partnersId: true,

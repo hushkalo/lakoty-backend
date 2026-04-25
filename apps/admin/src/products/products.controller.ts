@@ -24,6 +24,7 @@ import {
 import { ProductDto } from "./dto/product.dto";
 import {
   ApiTags,
+  ApiBody,
   ApiOperation,
   ApiResponse,
   ApiParam,
@@ -40,6 +41,16 @@ import {
   ErrorModel,
 } from "@shared/error-model";
 import { CrmProductDto } from "./dto/crm-product.dto";
+import {
+  AllVariantGroupsResponseDto,
+  CreateVariantGroupDto,
+  CreateVariantGroupResponseDto,
+} from "./dto/create-variant-group.dto";
+import {
+  AllColorsResponseDto,
+  CreateColorsDto,
+  CreateColorsResponseDto,
+} from "./dto/color.dto";
 
 @ApiTags("Products")
 @Controller("products")
@@ -222,6 +233,128 @@ export class ProductsController {
     Omit<ProductDto, "_count" | "category" | "images" | "productSizes">
   > {
     return this.productsService.create({ data, user });
+  }
+
+  @ApiOperation({ summary: "Create colors (batch)" })
+  @ApiBody({
+    description: "Create multiple colors in one request",
+    type: CreateColorsDto,
+    examples: {
+      default: {
+        summary: "Create white, black and blue",
+        value: {
+          colors: [
+            { name: "White", hex: "#FFFFFF" },
+            { name: "Black", hex: "#000000" },
+            { name: "Blue", hex: "#1E3A8A" },
+          ],
+        },
+      },
+    },
+  })
+  @ApiCreatedResponse({
+    description: "Colors successfully created",
+    type: CreateColorsResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: "Bad Request",
+    type: AppErrorValidationWithArray,
+    example: ErrorModel.VALIDATION_FAILED,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Unauthorized",
+    type: AppError,
+    example: ErrorModel.USER_UNAUTHORIZED,
+  })
+  @UsePipes(ValidationPipe)
+  @UseGuards(JwtGuard)
+  @Post("colors/create")
+  createColor(@Body() data: CreateColorsDto): Promise<CreateColorsResponseDto> {
+    return this.productsService.createColors(data);
+  }
+
+  @ApiOperation({ summary: "Get all colors" })
+  @ApiResponse({
+    status: 200,
+    description: "Colors successfully retrieved",
+    type: AllColorsResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Unauthorized",
+    type: AppError,
+    example: ErrorModel.USER_UNAUTHORIZED,
+  })
+  @UseGuards(JwtGuard)
+  @Get("colors")
+  findAllColors(): Promise<AllColorsResponseDto> {
+    return this.productsService.findAllColors();
+  }
+
+  @ApiOperation({ summary: "Create product variant group" })
+  @ApiCreatedResponse({
+    description: "Variant group successfully created",
+    type: CreateVariantGroupResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: "Bad Request",
+    type: AppErrorValidationWithArray,
+    example: ErrorModel.VALIDATION_FAILED,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Unauthorized",
+    type: AppError,
+    example: ErrorModel.USER_UNAUTHORIZED,
+  })
+  @UsePipes(ValidationPipe)
+  @UseGuards(JwtGuard)
+  @Post("variant-groups/create")
+  createVariantGroup(
+    @Body() data: CreateVariantGroupDto,
+  ): Promise<CreateVariantGroupResponseDto> {
+    return this.productsService.createVariantGroup(data);
+  }
+
+  @ApiOperation({ summary: "Get all product variant groups" })
+  @ApiResponse({
+    status: 200,
+    description: "Variant groups successfully retrieved",
+    type: AllVariantGroupsResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: "Unauthorized",
+    type: AppError,
+    example: ErrorModel.USER_UNAUTHORIZED,
+  })
+  @ApiQuery({
+    name: "take",
+    required: false,
+    type: Number,
+    description: "Number of records to take",
+  })
+  @ApiQuery({
+    name: "skip",
+    required: false,
+    type: Number,
+    description: "Number of records to skip",
+  })
+  @ApiQuery({
+    name: "searchString",
+    required: false,
+    type: String,
+    description: "Search by product name",
+  })
+  @UseGuards(JwtGuard)
+  @Get("variant-groups")
+  findAllVariantGroups(
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+    @Query("searchString") searchString?: string,
+  ): Promise<AllVariantGroupsResponseDto> {
+    return this.productsService.findAllVariantGroups({
+      take: take ? +take : undefined,
+      skip: skip ? +skip : undefined,
+      searchString,
+    });
   }
 
   @ApiOperation({ summary: "Get all products" })

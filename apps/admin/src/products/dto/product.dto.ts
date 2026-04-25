@@ -1,4 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ColorDto } from "./color.dto";
 
 export class ProductImage {
   @ApiProperty({ description: "Unique identifier", example: "img123" })
@@ -56,7 +57,7 @@ export class ProductSizeDto {
   updatedAt: Date;
 }
 
-export class Category {
+export class ProductCategoryDto {
   @ApiProperty({ description: "Unique identifier", example: "cat123" })
   id: string;
 
@@ -70,8 +71,8 @@ export class Category {
   })
   description: string | null;
 
-  @ApiProperty({ description: "External CRM ID", example: 67890 })
-  keyCrmId: number;
+  @ApiProperty({ description: "External CRM ID", example: 67890, nullable: true })
+  keyCrmId: number | null;
 
   @ApiProperty({ description: "URL-friendly name", example: "t-shirts" })
   alias: string;
@@ -85,9 +86,10 @@ export class Category {
 
   @ApiProperty({
     description: "Category image URL",
+    nullable: true,
     example: "https://example.com/category.jpg",
   })
-  imageUrl: string;
+  imageUrl: string | null;
 
   @ApiProperty({ description: "Whether category is hidden", example: false })
   hidden: boolean;
@@ -116,6 +118,25 @@ export class Category {
     example: "2024-01-02T00:00:00Z",
   })
   updatedAt: Date;
+}
+
+export class ProductVariantGroupItemDto {
+  @ApiProperty({ description: "Product ID in group", example: "prod456" })
+  id: string;
+
+  @ApiProperty({ description: "Product color", type: ColorDto, nullable: true })
+  color: ColorDto | null;
+}
+
+export class ProductVariantGroupDto {
+  @ApiProperty({ description: "Group ID", example: "group123" })
+  id: string;
+
+  @ApiProperty({ description: "Group name", nullable: true, example: "Nike Air Max 270" })
+  name: string | null;
+
+  @ApiProperty({ description: "Products in this group", type: [ProductVariantGroupItemDto] })
+  products: ProductVariantGroupItemDto[];
 }
 
 export class ProductCount {
@@ -168,8 +189,8 @@ export class ProductDto {
   @ApiProperty({ description: "Available quantity", example: 50 })
   quantity: number;
 
-  @ApiProperty({ description: "External CRM ID", example: 13579 })
-  keyCrmId: number;
+  @ApiProperty({ description: "External CRM ID", nullable: true, example: 13579 })
+  keyCrmId: number | null;
 
   @ApiProperty({ description: "Whether product is hidden", example: false })
   hidden: boolean;
@@ -182,6 +203,18 @@ export class ProductDto {
 
   @ApiProperty({ description: "Associated category ID", example: "cat123" })
   categoryId: string;
+
+  @ApiProperty({ description: "Partner ID", nullable: true, example: "partner123" })
+  partnersId: string | null;
+
+  @ApiProperty({ description: "Brand ID", nullable: true, example: "brand123" })
+  brandsId: string | null;
+
+  @ApiProperty({ description: "Color ID", nullable: true, example: "color123" })
+  colorId: string | null;
+
+  @ApiProperty({ description: "Variant group ID", nullable: true, example: "group123" })
+  variantGroupId: string | null;
 
   @ApiProperty({
     description: "Creation timestamp",
@@ -201,9 +234,26 @@ export class ProductDto {
   @ApiProperty({ description: "Product sizes", type: [ProductSizeDto] })
   productSizes: ProductSizeDto[];
 
-  @ApiProperty({ description: "Product category", type: Category })
-  category: Category;
+  @ApiProperty({ description: "Product category", type: ProductCategoryDto })
+  category: ProductCategoryDto;
+
+  @ApiPropertyOptional({
+    description: "Product color",
+    type: ColorDto,
+    nullable: true,
+  })
+  color?: ColorDto | null;
+
+  @ApiPropertyOptional({
+    description: "Variant group",
+    type: ProductVariantGroupDto,
+    nullable: true,
+  })
+  variantGroup?: ProductVariantGroupDto | null;
 
   @ApiProperty({ description: "Related counts", type: ProductCount })
   _count: ProductCount;
 }
+
+// Keep old alias for backward compat
+export { ProductCategoryDto as Category };
