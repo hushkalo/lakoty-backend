@@ -158,6 +158,10 @@ export class ProductsService {
         variantGroup: {
           include: {
             products: {
+              where: {
+                isDeleted: false,
+                hidden: false,
+              },
               include: {
                 color: true,
               },
