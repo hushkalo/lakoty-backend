@@ -125,6 +125,11 @@ export class ProductsController {
     type: String,
     description: "Parent category's products",
   })
+  @ApiQuery({
+    name: "secondCategoryId",
+    required: false,
+    type: String,
+  })
   @ApiResponse({
     status: 200,
     description: "List of products",
@@ -156,6 +161,7 @@ export class ProductsController {
       brand_name?: string;
     },
     @Query("parentCategoryWithProduct") parentCategoryWithProduct?: string,
+    @Query("secondCategorySlug") secondCategorySlug?: string,
   ): Promise<ProductsResponseDto> {
     return this.productsService.findAll({
       take: Number(take) || 12,
@@ -185,24 +191,29 @@ export class ProductsController {
             lte: filter?.max_price ? +filter.max_price : undefined,
           },
         alias: alias ? alias : undefined,
-        category: {
-          id: categoryAlias
-            ? undefined
-            : parentCategoryWithProduct === "true"
-              ? parentCategoryId
-              : categoryId || filter?.category_id
-                ? {
-                    in: [categoryId, filter?.category_id?.split(",")]
-                      .filter(Boolean)
-                      .flat(),
-                  }
-                : undefined,
-          alias: categoryAlias || undefined,
-          parentCategoryId: categoryAlias
-            ? undefined
-            : parentCategoryWithProduct === "true"
-              ? undefined
-              : parentCategoryId,
+        category: secondCategorySlug
+          ? undefined
+          : {
+              id: categoryAlias
+                ? undefined
+                : parentCategoryWithProduct === "true"
+                  ? parentCategoryId
+                  : categoryId || filter?.category_id
+                    ? {
+                        in: [categoryId, filter?.category_id?.split(",")]
+                          .filter(Boolean)
+                          .flat(),
+                      }
+                    : undefined,
+              alias: categoryAlias || undefined,
+              parentCategoryId: categoryAlias
+                ? undefined
+                : parentCategoryWithProduct === "true"
+                  ? undefined
+                  : parentCategoryId,
+            },
+        secondCategory: {
+          alias: secondCategorySlug || undefined,
         },
         discount: sale ? { gt: 1 } : undefined,
         isNovelty: novelty === "true" ? true : undefined,
@@ -273,6 +284,9 @@ export class ProductsController {
     }
     const recommendations = await this.productsService.getRecommendedProducts({
       where: {
+        alias: {
+          not: alias,
+        },
         category: {
           id: product.categoryId,
         },

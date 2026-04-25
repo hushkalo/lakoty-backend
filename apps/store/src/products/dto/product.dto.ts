@@ -176,10 +176,24 @@ export class ProductDto {
   categoryId: string;
 
   @ApiProperty({
+    description: "second category ID of the product",
+    nullable: true,
+    example: "cmdg2chaw00129lj3uybbs139",
+  })
+  secondCategoryId: string | null;
+
+  @ApiProperty({
     description: "Object containing category details",
     type: CategoryDto,
   })
   category: CategoryDto;
+
+  @ApiProperty({
+    description: "Object containing second category details",
+    type: CategoryDto,
+    nullable: true,
+  })
+  secondCategory?: CategoryDto | null;
 
   @ApiProperty({
     description: "Object containing brand details",

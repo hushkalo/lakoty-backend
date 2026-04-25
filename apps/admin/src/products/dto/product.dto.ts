@@ -204,6 +204,13 @@ export class ProductDto {
   @ApiProperty({ description: "Associated category ID", example: "cat123" })
   categoryId: string;
 
+  @ApiProperty({
+    description: "Associated second category ID",
+    example: "cat456",
+    nullable: true,
+  })
+  secondCategoryId: string | null;
+
   @ApiProperty({ description: "Partner ID", nullable: true, example: "partner123" })
   partnersId: string | null;
 
@@ -236,6 +243,13 @@ export class ProductDto {
 
   @ApiProperty({ description: "Product category", type: ProductCategoryDto })
   category: ProductCategoryDto;
+
+  @ApiProperty({
+    description: "Product second category",
+    type: ProductCategoryDto,
+    nullable: true,
+  })
+  secondCategory?: ProductCategoryDto | null;
 
   @ApiPropertyOptional({
     description: "Product color",

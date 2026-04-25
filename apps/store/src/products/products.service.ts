@@ -51,7 +51,9 @@ export class ProductsService {
             isAvailable: true,
           },
         },
+
         category: true,
+        secondCategory: true,
         Brand: true,
       },
       omit: {
@@ -105,6 +107,7 @@ export class ProductsService {
           },
         },
         category: true,
+        secondCategory: true,
         Brand: true,
       },
       omit: {
@@ -153,6 +156,7 @@ export class ProductsService {
           },
         },
         category: true,
+        secondCategory: true,
         Brand: true,
         Partner: true,
         variantGroup: {

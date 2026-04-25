@@ -29,7 +29,8 @@ model Category {
   depth            Int        @default(0)
   top              Boolean    @default(false)
   pathname         String[]
-  products         Product[]
+  products         Product[]  @relation("category")
+  secondProducts   Product[]  @relation("SecondCategory")
   isDeleted        Boolean    @default(false)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -44,7 +45,7 @@ model Product {
   top              Boolean        @default(false)
   alias            String         @unique
   sku              String?
-  category         Category       @relation(fields: [categoryId], references: [id])
+  category         Category       @relation("category", fields: [categoryId], references: [id])
   quantity         Int            @default(0)
   partnersId       String?
   brandsId         String?
@@ -65,6 +66,7 @@ model Product {
   Brand        Brands?              @relation(fields: [brandsId], references: [id])
   Partner      Partners?            @relation(fields: [partnersId], references: [id])
   color        Color?               @relation(fields: [colorId], references: [id])
+  secondCategory Category?           @relation("SecondCategory", fields: [secondCategoryId], references: [id])
   variantGroup ProductVariantGroup? @relation(fields: [variantGroupId], references: [id])
   OrderProduct OrderProduct[]
 
