@@ -26,6 +26,7 @@ import {
   CrmOrderResponse,
   CrmOrderDetails,
 } from "./dto/partner-types.dto";
+import { MarketingDto } from "../dto/marketing.dto";
 
 @Injectable()
 export class OrderService {
@@ -41,6 +42,31 @@ export class OrderService {
     return `orders:${sessionId}`;
   }
 
+  // UTM метки не отдаём наружу — заказ можно получить по id без авторизации
+  private readonly omitMarketingColumns = {
+    utmSource: true,
+    utmMedium: true,
+    utmCampaign: true,
+    utmTerm: true,
+    utmContent: true,
+  } as const;
+
+  private mapMarketingToColumns(marketing?: MarketingDto): {
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    utmTerm: string | null;
+    utmContent: string | null;
+  } {
+    return {
+      utmSource: marketing?.utm_source ?? null,
+      utmMedium: marketing?.utm_medium ?? null,
+      utmCampaign: marketing?.utm_campaign ?? null,
+      utmTerm: marketing?.utm_term ?? null,
+      utmContent: marketing?.utm_content ?? null,
+    };
+  }
+
   findAll(params: {
     take: number;
     skip: number;
@@ -48,6 +74,7 @@ export class OrderService {
   }): Promise<OrderDto[]> {
     return this.prisma.order.findMany({
       ...params,
+      omit: this.omitMarketingColumns,
       include: {
         OrderProduct: {
           include: {
@@ -118,6 +145,7 @@ export class OrderService {
           warehouseAddress: data.warehouseAddress,
           warehouseNumber: data.warehouseNumber,
           warehouseType: data.warehouseType,
+          ...this.mapMarketingToColumns(data.marketing),
           OrderProduct: {
             createMany: {
               data: data.orderProducts.map((item) => ({
@@ -186,6 +214,8 @@ export class OrderService {
     }
   }
 
+  // UTM метки — атрибуция момента создания заказа, обновлять их нельзя.
+  // Prisma.OrderUpdateInput не содержит поля marketing, поэтому оно сюда не попадёт.
   update(
     orderId: string,
     data: Prisma.OrderUpdateInput,
@@ -250,6 +280,7 @@ export class OrderService {
   }): Promise<OrderDto | null> {
     const order = await this.prisma.order.findUnique({
       ...params,
+      omit: this.omitMarketingColumns,
       include: {
         OrderProduct: {
           include: {
@@ -442,6 +473,7 @@ export class OrderService {
           status: "not_paid",
         },
       ],
+      marketing: data.marketing,
     };
 
     const response = await this.httpService.axiosRef.post<

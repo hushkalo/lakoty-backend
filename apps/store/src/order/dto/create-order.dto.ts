@@ -15,6 +15,7 @@ import {
   IsBoolean,
 } from "class-validator";
 import { IsCUID } from "../../validations/is-cuid.validation";
+import { MarketingDto } from "../../dto/marketing.dto";
 
 export enum PaymentType {
   PREPAY = "PREPAY",
@@ -228,4 +229,14 @@ export class CreateOrderDto {
   @Type(() => CreateOrderProductDto)
   @ArrayNotEmpty()
   orderProducts: CreateOrderProductDto[];
+
+  @ApiProperty({
+    description: "UTM marks of the visit the order was created from",
+    type: MarketingDto,
+    required: false,
+  })
+  @ValidateNested()
+  @Type(() => MarketingDto)
+  @IsOptional()
+  marketing?: MarketingDto;
 }

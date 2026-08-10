@@ -1,3 +1,5 @@
+import { MarketingDto } from "../../dto/marketing.dto";
+
 export class CreateOrderCrmDto {
   source_id: number;
   buyer_comment: string;
@@ -6,6 +8,7 @@ export class CreateOrderCrmDto {
   shipping: ShippingDto;
   products: ProductDto[];
   payments: PaymentDto[];
+  marketing?: MarketingDto;
 }
 
 export class PaymentDto {
