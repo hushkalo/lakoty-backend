@@ -1,31 +1,217 @@
+x-app-env: &app-env
+  NODE_ENV: production
+  BODY_LIMIT: ${BODY_LIMIT:-5mb}
+  HOUR_IN_MILLISECONDS: ${HOUR_IN_MILLISECONDS:-3600000}
+  POSTGRES_USER: ${POSTGRES_USER:-admin}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+  POSTGRES_DATABASE: ${POSTGRES_DATABASE:-lakotiy_store}
+  POSTGRES_HOST: postgres:5432
+  DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@postgres:5432/${POSTGRES_DATABASE:-lakotiy_store}?schema=public
+  MANAGER_ID: ${MANAGER_ID:-11}
+  SOURCE_ID: ${SOURCE_ID:-22}
+  NOVA_POST_API_URL: ${NOVA_POST_API_URL:-https://api.novaposhta.ua/v2.0/json/}
+  NOVA_POST_API_KEY: ${NOVA_POST_API_KEY:-}
+  CRM_API_URL: ${CRM_API_URL:-https://openapi.keycrm.app/v1}
+  CRM_API_KEY: ${CRM_API_KEY:-}
+
+x-app-build: &app-build
+  context: .
+  dockerfile: docker/Dockerfile
+  target: runner
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lakoty-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-lakotiy_store}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DATABASE:-lakotiy_store}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lakoty-net
+
   redis-master:
     image: redis:7
     container_name: redis-master
+    restart: unless-stopped
     command: ["redis-server", "/etc/redis/redis-master.conf"]
     volumes:
       - ./docker/redis/redis-master.conf:/etc/redis/redis-master.conf:ro
       - redis-master-data:/data
     ports:
-      - "6379:6379"
+      - "${REDIS_MASTER_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
-      - redis-net
+      - lakoty-net
 
   redis-replica:
     image: redis:7
     container_name: redis-replica
+    restart: unless-stopped
     command: ["redis-server", "/etc/redis/redis-replica.conf"]
     volumes:
       - ./docker/redis/redis-replica.conf:/etc/redis/redis-replica.conf:ro
       - redis-replica-data:/data
+    ports:
+      - "${REDIS_REPLICA_PORT:-6380}:6379"
     depends_on:
-      - redis-master
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
-      - redis-net
+      - lakoty-net
+
+  # Одноразово накатує prisma-міграції перед стартом бекендів
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: migrator
+    image: lakoty-migrate
+    container_name: lakoty-migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@postgres:5432/${POSTGRES_DATABASE:-lakotiy_store}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - lakoty-net
+
+  # Сид (категорії/бренди/товари з KeyCRM + ролі + користувачі).
+  # Не запускається автоматично: docker compose --profile seed run --rm seed
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: seeder
+    image: lakoty-seed
+    container_name: lakoty-seed
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin}@postgres:5432/${POSTGRES_DATABASE:-lakotiy_store}?schema=public
+      CRM_API_URL: ${CRM_API_URL:-https://openapi.keycrm.app/v1}
+      CRM_API_KEY: ${CRM_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    networks:
+      - lakoty-net
+
+  admin:
+    build:
+      <<: *app-build
+      args:
+        APP: admin
+    image: lakoty-admin
+    container_name: lakoty-admin
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      TYPE_REPO: admin
+      BASE_PORT: 8081
+      BASE_URL: ${ADMIN_BASE_URL:-http://localhost:8081}
+      CORS_ORIGIN: ${ADMIN_CORS_ORIGIN:-http://localhost:5173}
+      CLIENT_URL: ${ADMIN_CLIENT_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      JWT_ACCESS_TOKEN_EXPIRES_IN: ${JWT_ACCESS_TOKEN_EXPIRES_IN:-30m}
+      JWT_REFRESH_TOKEN_EXPIRES_IN: ${JWT_REFRESH_TOKEN_EXPIRES_IN:-7d}
+    ports:
+      - "${ADMIN_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('net').connect(8081,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - lakoty-net
+
+  store:
+    build:
+      <<: *app-build
+      args:
+        APP: store
+    image: lakoty-store
+    container_name: lakoty-store
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      TYPE_REPO: store
+      BASE_PORT: 8080
+      BASE_URL: ${STORE_BASE_URL:-http://localhost:8080}
+      CORS_ORIGIN: ${STORE_CORS_ORIGIN:-http://localhost:3000}
+      CLIENT_URL: ${STORE_CLIENT_URL:-http://localhost:3000}
+      REDIS_HOST: redis-master
+      REDIS_PORT: 6379
+      MONOBANK_API_URL: ${MONOBANK_API_URL:-https://api.monobank.ua/api}
+      MONOBANK_API_KEY: ${MONOBANK_API_KEY:-}
+      PREPAY_ID: ${PREPAY_ID:-32}
+      POSTPAY_ID: ${POSTPAY_ID:-27}
+    ports:
+      - "${STORE_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('net').connect(8080,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - lakoty-net
 
 networks:
-  redis-net:
+  lakoty-net:
 
 volumes:
+  postgres-data:
   redis-master-data:
   redis-replica-data:

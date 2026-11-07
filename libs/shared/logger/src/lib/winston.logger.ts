@@ -38,6 +38,8 @@ const prodLogger = {
     format.json(),
   ),
   transports: [
+    // stdout потрібен, щоб логи було видно через `docker compose logs`
+    new transports.Console({ level: "info" }),
     new transports.File(options.file),
     new transports.File({
       filename: "combine.log",

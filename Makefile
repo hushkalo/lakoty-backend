@@ -53,4 +53,41 @@ prisma-generate:
 	@npm run prisma:generate
 	@echo "Generating prisma client done"
 
-.PHONY: build format start-dev-admin start-prod-admin start-dev-store start-prod-store lint prisma-generate prisma-migrate prisma-seed
+docker-build:
+	@echo "Building docker images..."
+	@docker compose build
+
+docker-up:
+	@echo "Starting all containers (postgres, redis + replica, admin, store)..."
+	@docker compose up -d --build
+
+docker-down:
+	@echo "Stopping containers..."
+	@docker compose down
+
+docker-down-volumes:
+	@echo "Stopping containers and removing volumes..."
+	@docker compose down -v
+
+docker-logs:
+	@docker compose logs -f admin store
+
+docker-ps:
+	@docker compose ps
+
+docker-migrate:
+	@echo "Applying prisma migrations..."
+	@docker compose run --rm migrate
+
+docker-seed:
+	@echo "Seeding database inside docker..."
+	@docker compose --profile seed run --rm seed
+
+docker-restart-admin:
+	@docker compose up -d --build admin
+
+docker-restart-store:
+	@docker compose up -d --build store
+
+
+.PHONY: build format start-dev-admin start-prod-admin start-dev-store start-prod-store lint prisma-generate prisma-migrate prisma-seed docker-build docker-up docker-down docker-down-volumes docker-logs docker-ps docker-migrate docker-seed docker-restart-admin docker-restart-store

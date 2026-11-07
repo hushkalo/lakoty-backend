@@ -71,3 +71,40 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](LICENSE).
+
+## Docker
+
+Локальний стек: PostgreSQL, Redis (master + replica), admin-бекенд, store-бекенд.
+
+```bash
+# 1. Створити .env для docker compose
+cp .env.docker.example .env   # далі заповнити ключі API / JWT_SECRET
+
+# 2. Зібрати та підняти все
+make docker-up                # або: docker compose up -d --build
+
+# 3. Логи бекендів
+make docker-logs
+```
+
+Сервіси та порти (за замовчуванням, змінюються через `.env`):
+
+| Сервіс          | Порт на хості | Всередині мережі  |
+| --------------- | ------------- | ----------------- |
+| `postgres`      | 5432          | `postgres:5432`   |
+| `redis-master`  | 6379          | `redis-master:6379` |
+| `redis-replica` | 6380          | `redis-replica:6379` |
+| `admin`         | 8081          | `admin:8081`      |
+| `store`         | 8080          | `store:8080`      |
+
+Міграції Prisma накатує одноразовий сервіс `migrate` (`prisma migrate deploy`) — бекенди
+стартують лише після його успішного завершення. Запустити вручну: `make docker-migrate`.
+
+Корисні команди:
+
+```bash
+make docker-ps              # статус контейнерів
+make docker-restart-store   # перезібрати й перезапустити тільки store
+make docker-down            # зупинити
+make docker-down-volumes    # зупинити та видалити дані (postgres/redis)
+```

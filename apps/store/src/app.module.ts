@@ -3,8 +3,12 @@ import { BrandModule } from "./brands/brand.module";
 import { CategoriesModule } from "./categories/categories.module";
 import { PrismaModule } from "@libs/prisma-client";
 import { ProductsModule } from "./products/products.module";
-import { ConfigModule } from "@nestjs/config";
-import { validate, configuration } from "@shared/configuration";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import {
+  validate,
+  configuration,
+  EnvironmentVariablesForStore,
+} from "@shared/configuration";
 import { OrderModule } from "./order/order.module";
 import { NovaPostModule } from "./nova-post/nova-post.module";
 import { CourseModule } from "./course/course.module";
@@ -35,11 +39,17 @@ import { BullModule } from "@nestjs/bullmq";
     BasketModule,
     BrandModule,
     PartnerModule,
-    BullModule.forRoot({
-      connection: {
-        host: "localhost",
-        port: 6379,
-      },
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (
+        configService: ConfigService<EnvironmentVariablesForStore>,
+      ) => ({
+        connection: {
+          host: configService.get("REDIS_HOST"),
+          port: configService.get("REDIS_PORT"),
+        },
+      }),
     }),
   ],
   providers: [],
