@@ -10,6 +10,7 @@ import { AuthModule } from "./auth/auth.module";
 import { validate, configuration } from "@shared/configuration";
 import { NovaPostModule } from "./nova-post/nova-post.module";
 import { PartnerModule } from "./partners/partner.module";
+import { McpModule } from "./mcp/mcp.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PartnerModule } from "./partners/partner.module";
     AuthModule,
     NovaPostModule,
     PartnerModule,
+    McpModule,
   ],
   providers: [],
 })

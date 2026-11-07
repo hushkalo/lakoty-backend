@@ -1,7 +1,9 @@
 import { plainToInstance } from "class-transformer";
 import {
   IsEnum,
+  IsEmail,
   IsNumber,
+  IsOptional,
   IsString,
   Max,
   Min,
@@ -80,6 +82,14 @@ export class EnvironmentVariablesForAdmin extends EnvironmentValidationShared {
 
   @IsString()
   JWT_REFRESH_TOKEN_EXPIRES_IN: string;
+
+  @IsOptional()
+  @IsString()
+  MCP_API_KEY?: string;
+
+  @IsOptional()
+  @IsEmail()
+  MCP_USER_EMAIL?: string;
 }
 
 export class EnvironmentVariablesForStore extends EnvironmentValidationShared {

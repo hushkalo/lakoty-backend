@@ -26,4 +26,6 @@ export const configuration = () => ({
   REDIS_PORT: process.env["REDIS_PORT"],
   PREPAY_ID: process.env["PREPAY_ID"],
   POSTPAY_ID: process.env["POSTPAY_ID"],
+  MCP_API_KEY: process.env["MCP_API_KEY"],
+  MCP_USER_EMAIL: process.env["MCP_USER_EMAIL"],
 });
