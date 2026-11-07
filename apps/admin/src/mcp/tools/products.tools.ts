@@ -82,6 +82,39 @@ export class ProductsMcpTools {
     );
 
     server.registerTool(
+      "get_crm_product",
+      {
+        description:
+          "Fetch the KeyCRM version of a shop product (by shop product id or alias) " +
+          "using its partner's CRM. Returns CRM name, description, image URLs, quantity and prices; " +
+          "use update_product to copy them into the shop.",
+        inputSchema: {
+          id: z.string().optional().describe("Shop product id"),
+          alias: z.string().optional(),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      ({ id, alias }) =>
+        runTool(async () => {
+          if (!id && !alias) throw new Error("Pass either id or alias");
+          const productId =
+            id ?? (await this.productsService.findOne({ where: { alias } })).id;
+          const crmProduct = await this.productsService.getProductFromCrm({
+            id: productId,
+          });
+          return {
+            keyCrmId: crmProduct.id,
+            name: crmProduct.name,
+            description: crmProduct.description,
+            images: crmProduct.attachments_data,
+            quantity: crmProduct.quantity,
+            minPrice: crmProduct.min_price,
+            maxPrice: crmProduct.max_price,
+          };
+        }),
+    );
+
+    server.registerTool(
       "create_product",
       {
         description:
