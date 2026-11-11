@@ -1,4 +1,5 @@
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { json } from "express";
@@ -10,11 +11,16 @@ import { EnvironmentVariablesForAdmin } from "@shared/configuration";
 import { McpOAuthService } from "./mcp/oauth/mcp-oauth.service";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: WinstonModule.createLogger({
       instance: instance,
     }),
   });
+
+  // The app runs behind a local nginx, which sets X-Forwarded-For to the real client IP.
+  // Trust only that loopback hop, so req.ip (and the OAuth rate limiter) see the client
+  // instead of 127.0.0.1, and a forged X-Forwarded-For from outside cannot be trusted.
+  app.set("trust proxy", "loopback");
 
   const configService = app.get(ConfigService<EnvironmentVariablesForAdmin>);
 
