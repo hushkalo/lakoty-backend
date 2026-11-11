@@ -140,11 +140,12 @@ export class ProductsMcpTools {
       "update_product",
       {
         description:
-          "Partially update a product. Images/sizes with an id are updated, without id are created.",
+          "Partially update a product, including hiding it from the shop (hidden: true) or showing it again (hidden: false). " +
+          "Images/sizes with an id are updated, without id are created.",
         inputSchema: {
           id: z.string().describe("Product id"),
           data: dtoPayload(
-            `all optional: name, description, alias, price, categoryId, quantity, discount, top, isNovelty, ` +
+            `all optional: name, description, alias, price, categoryId, quantity, discount, top, isNovelty, hidden (boolean), ` +
               `images: (${productImageFields} + id?)[], productSizes: (${productSizeFields} + id?)[], ` +
               `variantGroupId, groupId, colorId (cuid | null)`,
           ),

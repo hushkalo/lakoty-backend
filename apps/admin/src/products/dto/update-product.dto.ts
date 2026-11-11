@@ -145,6 +145,15 @@ export class UpdateProductDto {
   isNovelty: boolean;
 
   @ApiProperty({
+    description: "Hide the product from the shop (true) or show it (false)",
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  hidden: boolean;
+
+  @ApiProperty({
     description: "Available sizes for the product",
     type: UpdateProductSize,
     isArray: true,
@@ -181,7 +190,8 @@ export class UpdateProductDto {
   groupId?: string;
 
   @ApiProperty({
-    description: "Color ID to assign to this product. Pass null to remove color.",
+    description:
+      "Color ID to assign to this product. Pass null to remove color.",
     example: "cmf5r5u1x0004vyl95m2a9pqr",
     required: false,
     nullable: true,
