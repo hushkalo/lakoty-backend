@@ -7,6 +7,7 @@ import { WinstonModule } from "nest-winston";
 import { instance } from "@shared/logger";
 import { ConfigService } from "@nestjs/config";
 import { EnvironmentVariablesForAdmin } from "@shared/configuration";
+import { McpOAuthService } from "./mcp/oauth/mcp-oauth.service";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -53,6 +54,11 @@ async function bootstrap() {
   }
   app.use(json({ limit: configService.get("BODY_LIMIT") || "1mb" }));
   app.use(cookieParser());
+  const mcpOAuth = app.get(McpOAuthService);
+  if (mcpOAuth.enabled) {
+    // OAuth endpoints for MCP clients live at the root (/.well-known, /authorize, /token, ...).
+    app.use(mcpOAuth.router());
+  }
   await app.listen(configService.get("BASE_PORT"));
   instance.log({
     message: `Application is running on: ${await app.getUrl()} time: ${new Date(

@@ -9,10 +9,10 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiExcludeController } from "@nestjs/swagger";
-import { type Request, type Response } from "express";
+import { type Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { McpApiKeyGuard } from "./mcp-api-key.guard";
+import { McpApiKeyGuard, type McpRequest } from "./mcp-api-key.guard";
 import { ProductsMcpTools } from "./tools/products.tools";
 import { CategoriesMcpTools } from "./tools/categories.tools";
 import { PartnersMcpTools } from "./tools/partners.tools";
@@ -32,10 +32,10 @@ export class McpController {
   ) {}
 
   @Post()
-  async handle(@Req() req: Request, @Res() res: Response) {
+  async handle(@Req() req: McpRequest, @Res() res: Response) {
     const server = new McpServer({ name: "lakoty-admin", version: "1.0.0" });
-    this.productsTools.register(server);
-    this.categoriesTools.register(server);
+    this.productsTools.register(server, req.mcpUserId);
+    this.categoriesTools.register(server, req.mcpUserId);
     this.partnersTools.register(server);
 
     const transport = new StreamableHTTPServerTransport({

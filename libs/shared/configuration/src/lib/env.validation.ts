@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   Min,
   validateSync,
@@ -90,6 +91,10 @@ export class EnvironmentVariablesForAdmin extends EnvironmentValidationShared {
   @IsOptional()
   @IsEmail()
   MCP_USER_EMAIL?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false, require_protocol: true })
+  MCP_PUBLIC_URL?: string;
 }
 
 export class EnvironmentVariablesForStore extends EnvironmentValidationShared {

@@ -26,7 +26,7 @@ export class ProductsMcpTools {
     private readonly mcpUser: McpUserService,
   ) {}
 
-  register(server: McpServer) {
+  register(server: McpServer, userId?: string) {
     server.registerTool(
       "list_products",
       {
@@ -131,7 +131,7 @@ export class ProductsMcpTools {
         runTool(async () =>
           this.productsService.create({
             data: await validateDto(CreateProductDto, data),
-            user: await this.mcpUser.getActingUser(),
+            user: await this.mcpUser.getActingUser(userId),
           }),
         ),
     );
@@ -170,7 +170,7 @@ export class ProductsMcpTools {
         runTool(async () =>
           this.productsService.remove({
             where: { id },
-            user: await this.mcpUser.getActingUser(),
+            user: await this.mcpUser.getActingUser(userId),
           }),
         ),
     );

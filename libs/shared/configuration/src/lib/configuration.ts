@@ -28,4 +28,5 @@ export const configuration = () => ({
   POSTPAY_ID: process.env["POSTPAY_ID"],
   MCP_API_KEY: process.env["MCP_API_KEY"],
   MCP_USER_EMAIL: process.env["MCP_USER_EMAIL"],
+  MCP_PUBLIC_URL: process.env["MCP_PUBLIC_URL"],
 });

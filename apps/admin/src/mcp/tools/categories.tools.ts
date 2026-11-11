@@ -23,7 +23,7 @@ export class CategoriesMcpTools {
     private readonly mcpUser: McpUserService,
   ) {}
 
-  register(server: McpServer) {
+  register(server: McpServer, userId?: string) {
     server.registerTool(
       "list_categories",
       {
@@ -105,7 +105,7 @@ export class CategoriesMcpTools {
           this.categoriesService.update({
             where: { id },
             data: await validateDto(UpdateCategoryDto, data),
-            user: await this.mcpUser.getActingUser(),
+            user: await this.mcpUser.getActingUser(userId),
           }),
         ),
     );

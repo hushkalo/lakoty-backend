@@ -11,7 +11,15 @@ export class McpUserService {
     private readonly configService: ConfigService<EnvironmentVariablesForAdmin>,
   ) {}
 
-  async getActingUser(): Promise<User> {
+  /** The OAuth-authenticated user if known, otherwise the MCP_USER_EMAIL user. */
+  async getActingUser(userId?: string): Promise<User> {
+    if (userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new BadRequestException(`MCP user ${userId} does not exist`);
+      }
+      return user;
+    }
     const email = this.configService.get<string>("MCP_USER_EMAIL");
     if (!email) {
       throw new BadRequestException(
