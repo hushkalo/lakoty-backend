@@ -174,7 +174,7 @@ export class McpOAuthService implements OAuthServerProvider {
       },
       LOGIN_REQUEST_TTL,
     );
-    this.sendLoginPage(res, 200, {
+    this.sendLoginPage(res, 200, params.redirectUri, {
       request,
       clientName: this.clientName(client),
     });
@@ -274,7 +274,7 @@ export class McpOAuthService implements OAuthServerProvider {
       (await comparePassword({ password, hashedPassword: user.password }));
     if (!passwordMatches) {
       this.logger.warn(`MCP OAuth login failed for ${email}`);
-      this.sendLoginPage(res, 401, {
+      this.sendLoginPage(res, 401, login.redirect_uri, {
         request,
         clientName: this.clientName(client),
         email,
@@ -307,15 +307,20 @@ export class McpOAuthService implements OAuthServerProvider {
   private sendLoginPage(
     res: Response,
     status: number,
+    redirectUri: string,
     params: Omit<Parameters<typeof renderLoginPage>[0], "action">,
   ) {
+    // Browsers apply form-action to the redirect that follows the form POST,
+    // so the client's redirect target must be allowed too.
+    const redirect = new URL(redirectUri);
+    const redirectSource =
+      redirect.origin === "null" ? redirect.protocol : redirect.origin;
     res
       .status(status)
       .set({
         "Cache-Control": "no-store",
         "X-Frame-Options": "DENY",
-        "Content-Security-Policy":
-          "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+        "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${redirectSource}; frame-ancestors 'none'`,
       })
       .type("html")
       .send(
