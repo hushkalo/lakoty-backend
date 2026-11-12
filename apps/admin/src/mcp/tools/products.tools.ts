@@ -7,6 +7,7 @@ import { UpdateProductDto } from "../../products/dto/update-product.dto";
 import { CreateColorsDto } from "../../products/dto/color.dto";
 import { CreateVariantGroupDto } from "../../products/dto/create-variant-group.dto";
 import { McpUserService } from "../mcp-user.service";
+import { KeyCrmClient } from "../keycrm.client";
 import {
   dtoPayload,
   paginationShape,
@@ -24,6 +25,7 @@ export class ProductsMcpTools {
   constructor(
     private readonly productsService: ProductsService,
     private readonly mcpUser: McpUserService,
+    private readonly keyCrm: KeyCrmClient,
   ) {}
 
   register(server: McpServer, userId?: string) {
@@ -111,6 +113,101 @@ export class ProductsMcpTools {
             minPrice: crmProduct.min_price,
             maxPrice: crmProduct.max_price,
           };
+        }),
+    );
+
+    server.registerTool(
+      "update_crm_product",
+      {
+        description:
+          "Change a product both in its partner's KeyCRM and in the shop (by shop product id or alias). " +
+          "price sets the CRM product price, the price of every CRM variant (size) and the shop price; " +
+          "the shop discount is kept, so the shop sale price follows it. " +
+          "images replaces the whole photo set in both places, in the given order.",
+        inputSchema: {
+          id: z.string().optional().describe("Shop product id"),
+          alias: z.string().optional(),
+          name: z.string().min(1).optional(),
+          description: z.string().min(1).optional(),
+          price: z.number().positive().optional(),
+          images: z.array(z.string().url()).min(1).optional(),
+        },
+        annotations: { destructiveHint: false, idempotentHint: true },
+      },
+      ({ id, alias, name, description, price, images }) =>
+        runTool(async () => {
+          if (!id && !alias) throw new Error("Pass either id or alias");
+          if (
+            [name, description, price, images].every((v) => v === undefined)
+          ) {
+            throw new Error(
+              "Pass at least one of name, description, price, images",
+            );
+          }
+          const product = await this.productsService.findOne({
+            where: id ? { id } : { alias },
+          });
+          if (!product.keyCrmId) {
+            throw new Error(`Product ${product.id} is not linked to KeyCRM`);
+          }
+          const partner = await this.keyCrm.partner(product.partnersId);
+
+          await this.keyCrm.request(
+            partner,
+            "PUT",
+            `/products/${product.keyCrmId}`,
+            {
+              name,
+              description,
+              price,
+              pictures: images,
+            },
+          );
+          let updatedOffers = 0;
+          if (price !== undefined) {
+            const offers = await this.keyCrm.listAll<{ id: number }>(
+              partner,
+              `/offers?filter[product_id]=${product.keyCrmId}`,
+            );
+            if (offers.length) {
+              await this.keyCrm.request(partner, "PUT", "/offers", {
+                offers: offers.map((offer) => ({ id: offer.id, price })),
+              });
+            }
+            updatedOffers = offers.length;
+          }
+
+          try {
+            const shopProduct = await this.productsService.update({
+              where: { id: product.id },
+              data: await validateDto(UpdateProductDto, {
+                ...(name !== undefined && { name }),
+                ...(description !== undefined && { description }),
+                ...(price !== undefined && { price }),
+                ...(images && {
+                  images: images.map((url, order) => ({ url, order })),
+                }),
+              }),
+            });
+            return {
+              crm: {
+                partner: partner.name,
+                keyCrmId: product.keyCrmId,
+                updatedOffers,
+              },
+              shop: {
+                id: shopProduct.id,
+                name: shopProduct.name,
+                price: shopProduct.price,
+                discount: shopProduct.discount,
+                images: shopProduct.images.length,
+              },
+            };
+          } catch (error) {
+            throw new Error(
+              `KeyCRM was updated, but the shop product was not: ${(error as Error).message}`,
+            );
+          }
         }),
     );
 

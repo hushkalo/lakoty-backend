@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
+import { HttpModule } from "@nestjs/axios";
 import { PrismaModule } from "@libs/prisma-client";
 import { ProductsModule } from "../products/products.module";
 import { CategoriesModule } from "../categories/categories.module";
@@ -8,6 +9,7 @@ import { PartnerModule } from "../partners/partner.module";
 import { McpController } from "./mcp.controller";
 import { McpApiKeyGuard } from "./mcp-api-key.guard";
 import { McpUserService } from "./mcp-user.service";
+import { KeyCrmClient } from "./keycrm.client";
 import { McpOAuthService } from "./oauth/mcp-oauth.service";
 import { ProductsMcpTools } from "./tools/products.tools";
 import { CategoriesMcpTools } from "./tools/categories.tools";
@@ -17,6 +19,7 @@ import { PartnersMcpTools } from "./tools/partners.tools";
   imports: [
     ConfigModule,
     JwtModule.register({}),
+    HttpModule,
     PrismaModule,
     ProductsModule,
     CategoriesModule,
@@ -26,6 +29,7 @@ import { PartnersMcpTools } from "./tools/partners.tools";
   providers: [
     McpApiKeyGuard,
     McpUserService,
+    KeyCrmClient,
     McpOAuthService,
     ProductsMcpTools,
     CategoriesMcpTools,
