@@ -15,4 +15,5 @@ export {
   Role,
   Brands,
   Partners,
+  Checkout,
 } from "./generated/client";

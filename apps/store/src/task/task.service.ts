@@ -54,12 +54,16 @@ export class TasksService {
             item.quantity,
         0,
       );
+      // Транзакцію Monobank прив'язуємо до платежу на сплачену онлайн суму:
+      // повна сума або передоплата (для старих замовлень prepaidAmount = null)
+      const paidOnlineAmount = order.prepaidAmount ?? totalSum;
 
       const orderFromCrm = await this.orderService.getOrderFromCrm(
         order.keyCrmOrderId,
       );
       const payment = orderFromCrm.payments.find(
-        (item) => item.status !== "canceled" && item.amount === totalSum,
+        (item) =>
+          item.status !== "canceled" && item.amount === paidOnlineAmount,
       );
       if (!payment) {
         this.logger.error(
@@ -83,6 +87,18 @@ export class TasksService {
       this.logger.error(error.message, error, this.SERVICE_NAME);
     }
     this.logger.debug("Handle payment end");
+  }
+
+  // Замовлення створюються лише після оплати: дотворюємо оплачені спроби,
+  // для яких створення в CRM упало, і звіряємо неоплачені, якщо webhook загубився
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleCheckouts() {
+    try {
+      await this.orderService.retryPaidCheckouts();
+      await this.orderService.syncPendingCheckouts();
+    } catch (error) {
+      this.logger.error(error.message, error, this.SERVICE_NAME);
+    }
   }
 
   @Cron(CronExpression.EVERY_30_MINUTES)

@@ -1,13 +1,19 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
-import { CreateOrderDto } from "./dto/create-order.dto";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from "@nestjs/common";
+import { CreateOrderDto, PaymentType } from "./dto/create-order.dto";
 import { HttpService } from "@nestjs/axios";
 import { ErrorModel } from "@shared/error-model";
 import {
+  CheckoutStatusResponseDto,
   CreateOrderResponseDto,
   MyOrdersDto,
   RetryOrderResponseDto,
 } from "./dto/responses.dto";
-import { Prisma, PrismaService, Partners } from "@libs/prisma-client";
+import { Checkout, Prisma, PrismaService, Partners } from "@libs/prisma-client";
 import { EnvironmentVariablesForStore } from "@shared/configuration";
 import { ConfigService } from "@nestjs/config";
 import { OrderCallbackCreateDto } from "./dto/order.callback.dto";
@@ -28,8 +34,41 @@ import {
 } from "./dto/partner-types.dto";
 import { MarketingDto } from "../dto/marketing.dto";
 
+/** Мінімальна передоплата для замовлення з оплатою при отриманні, грн */
+export const MIN_PREPAYMENT_UAH = 200;
+const UAH_CURRENCY_CODE = 980;
+const INVOICE_VALIDITY_SECONDS = 36000;
+const INVOICE_CUSTOMER_EMAILS = ["ushkalo.herman@gmail.com"];
+// Із цих статусів спроба може стати оплаченою (зокрема після повторного рахунку)
+const PAYABLE_CHECKOUT_STATUSES = [
+  "pending",
+  "processing",
+  "failure",
+  "expired",
+];
+const RETRYABLE_CHECKOUT_STATUSES = ["pending", "failure", "expired"];
+
+interface MonobankInvoiceStatus {
+  invoiceId: string;
+  status:
+    | "created"
+    | "processing"
+    | "hold"
+    | "success"
+    | "failure"
+    | "reversed"
+    | "expired";
+  amount: number;
+  ccy: number;
+  finalAmount?: number;
+  reference?: string;
+  failureReason?: string;
+}
+
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     private readonly httpService: HttpService,
     private prisma: PrismaService,
@@ -93,42 +132,332 @@ export class OrderService {
     return this.prisma.order.count(params);
   }
 
+  private calculateTotal(
+    items: { price: number; discount: number; quantity: number }[],
+  ): number {
+    return items.reduce(
+      (acc, item) =>
+        acc +
+        Math.round(item.price - (item.price * item.discount) / 100) *
+          item.quantity,
+      0,
+    );
+  }
+
+  // Повна оплата — сплачується вся сума; оплата при отриманні — обов'язкова
+  // передоплата MIN_PREPAYMENT_UAH (або вся сума, якщо замовлення дешевше).
+  private calculatePrepaidAmount(
+    paymentType: PaymentType | string,
+    totalAmount: number,
+  ): number {
+    if (paymentType === PaymentType.PREPAY) {
+      return totalAmount;
+    }
+    return Math.min(MIN_PREPAYMENT_UAH, totalAmount);
+  }
+
+  /**
+   * Оформлення замовлення. Замовлення в KeyCRM і в нашій базі тут НЕ
+   * створюється: зберігаємо спробу оформлення (Checkout) і виставляємо
+   * рахунок Monobank. Замовлення з'явиться лише після підтвердженої оплати
+   * (див. orderCallback / syncCheckoutPayment).
+   */
   async create(params: {
     data: CreateOrderDto;
     sessionId: string;
   }): Promise<CreateOrderResponseDto> {
-    if (params.sessionId) {
-      await this.basketService.clearBasket(params.sessionId);
+    const { data, sessionId } = params;
+
+    const totalAmount = this.calculateTotal(data.orderProducts);
+    const prepaidAmount = this.calculatePrepaidAmount(
+      data.paymentType,
+      totalAmount,
+    );
+    if (prepaidAmount <= 0) {
+      throw new BadRequestException(ErrorModel.INTERNAL_SERVER_ERROR);
     }
 
-    const { data } = params;
     try {
-      // Получаем информацию о продуктах с партнерами
+      // Перевіряємо товари і партнерів до виставлення рахунку,
+      // щоб покупець не заплатив за замовлення, яке не можна створити.
       const productsWithPartners = await this.getProductsWithPartners(
         data.orderProducts,
       );
+      this.groupProductsByPartner(productsWithPartners, data.orderProducts);
 
-      // Группируем продукты по партнерам
-      const productsByPartner = this.groupProductsByPartner(
-        productsWithPartners,
-        data.orderProducts,
+      const checkout = await this.prisma.checkout.create({
+        data: {
+          sessionId: sessionId || null,
+          paymentType: data.paymentType,
+          totalAmount,
+          prepaidAmount,
+          payload: JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue,
+        },
+      });
+
+      const invoice = await this.createCheckoutInvoice(checkout);
+
+      await this.prisma.checkout.update({
+        where: { id: checkout.id },
+        data: { invoiceId: invoice.invoiceId },
+      });
+
+      return {
+        message: "Checkout created. Waiting for payment.",
+        paymentPageUrl: invoice.pageUrl,
+        checkoutId: checkout.id,
+        prepaidAmount,
+        totalAmount,
+      };
+    } catch (e) {
+      this.logger.error(e);
+
+      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  private async createCheckoutInvoice(
+    checkout: Checkout,
+  ): Promise<{ invoiceId: string; pageUrl: string }> {
+    const data = checkout.payload as unknown as CreateOrderDto;
+    const isFullPrepay = checkout.paymentType === PaymentType.PREPAY;
+
+    const basketOrder = isFullPrepay
+      ? data.orderProducts.map((item) => {
+          const priceWithDiscount =
+            Math.round(item.price - (item.price * item.discount) / 100) * 100;
+          return {
+            name: `${item.name} (${item.size?.name || "base"})`,
+            qty: item.quantity,
+            sum: priceWithDiscount,
+            total: priceWithDiscount * item.quantity,
+            icon: item.image,
+            unit: "шт.",
+          };
+        })
+      : [
+          {
+            name: `Передоплата за замовлення на суму ${checkout.totalAmount} грн`,
+            qty: 1,
+            sum: checkout.prepaidAmount * 100,
+            total: checkout.prepaidAmount * 100,
+            unit: "шт.",
+          },
+        ];
+
+    const bodyInvoice = {
+      amount: checkout.prepaidAmount * 100,
+      ccy: UAH_CURRENCY_CODE,
+      merchantPaymInfo: {
+        reference: checkout.id,
+        destination: isFullPrepay
+          ? "Lakotiy Store"
+          : "Lakotiy Store — передоплата за замовлення",
+        customerEmails: INVOICE_CUSTOMER_EMAILS,
+        basketOrder,
+      },
+      redirectUrl: `${this.configService.get("CLIENT_URL")}/checkout/status?checkoutId=${checkout.id}`,
+      webHookUrl: `${this.configService.get("BASE_URL")}/api/orders/callback`,
+      validity: INVOICE_VALIDITY_SECONDS,
+    };
+
+    const response = await this.httpService.axiosRef.post<{
+      invoiceId: string;
+      pageUrl: string;
+    }>("/merchant/invoice/create", bodyInvoice, {
+      ...this.monobankRequestConfig(),
+    });
+    return response.data;
+  }
+
+  private monobankRequestConfig(): {
+    baseURL: string;
+    headers: Record<string, string>;
+  } {
+    return {
+      baseURL: this.configService.get<string>("MONOBANK_API_URL"),
+      headers: {
+        "X-Token": this.configService.get<string>("MONOBANK_API_KEY"),
+      },
+    };
+  }
+
+  private async getMonobankInvoiceStatus(
+    invoiceId: string,
+  ): Promise<MonobankInvoiceStatus> {
+    const response = await this.httpService.axiosRef.get<MonobankInvoiceStatus>(
+      "/merchant/invoice/status",
+      {
+        params: { invoiceId },
+        ...this.monobankRequestConfig(),
+      },
+    );
+    return response.data;
+  }
+
+  private async removeMonobankInvoice(invoiceId: string): Promise<void> {
+    try {
+      await this.httpService.axiosRef.post(
+        "/merchant/invoice/remove",
+        { invoiceId },
+        {
+          ...this.monobankRequestConfig(),
+        },
       );
-
-      // Создаем заказы в CRM для каждого партнера
-      const crmOrders = await this.createOrdersInCrmByPartners(
-        data,
-        productsByPartner,
+    } catch (e) {
+      // Рахунок міг уже протермінуватися — це не заважає виставити новий
+      this.logger.warn(
+        `Could not remove Monobank invoice ${invoiceId}: ${(e as Error).message}`,
       );
+    }
+  }
 
-      // Выбираем основной заказ (первый) для сохранения в нашей базе
-      const mainCrmOrder = crmOrders[0];
+  /**
+   * Звіряє стан оплати спроби оформлення з Monobank. Даним із тіла webhook
+   * не довіряємо: статус і reference беремо із запиту до API Monobank
+   * з нашим токеном, тож підроблений callback не створить замовлення.
+   */
+  async syncCheckoutPayment(
+    checkout: Checkout,
+    invoiceId?: string,
+  ): Promise<Checkout> {
+    const invoiceIdToCheck = invoiceId || checkout.invoiceId;
+    if (!invoiceIdToCheck) {
+      return checkout;
+    }
 
-      // Получаем все остальные ID заказов CRM для additionalKeyCrmIds
-      const additionalCrmOrderIds = crmOrders
-        .slice(1)
-        .map((order) => order.id.toString());
+    const invoice = await this.getMonobankInvoiceStatus(invoiceIdToCheck);
+    if (invoice.reference !== checkout.id) {
+      this.logger.warn(
+        `Monobank invoice ${invoiceIdToCheck} reference ${invoice.reference} does not match checkout ${checkout.id}`,
+      );
+      return checkout;
+    }
 
-      const newOrder = await this.prisma.order.create({
+    switch (invoice.status) {
+      case "success": {
+        if (
+          invoice.ccy !== UAH_CURRENCY_CODE ||
+          invoice.amount < checkout.prepaidAmount * 100
+        ) {
+          this.logger.error(
+            `Monobank invoice ${invoice.invoiceId} amount ${invoice.amount}/${invoice.ccy} does not cover checkout ${checkout.id} prepayment ${checkout.prepaidAmount}`,
+          );
+          break;
+        }
+        const claimed = await this.prisma.checkout.updateMany({
+          where: {
+            id: checkout.id,
+            status: { in: PAYABLE_CHECKOUT_STATUSES },
+          },
+          data: {
+            status: "paid",
+            invoiceId: invoice.invoiceId,
+            paidAt: new Date(),
+            errorMessage: null,
+          },
+        });
+        if (claimed.count) {
+          await this.completeCheckout(checkout.id);
+        } else if (
+          checkout.invoiceId !== invoice.invoiceId &&
+          checkout.status === "completed"
+        ) {
+          this.logger.error(
+            `Checkout ${checkout.id} was paid twice (invoice ${invoice.invoiceId}), refund needed`,
+          );
+        }
+        break;
+      }
+      case "processing":
+      case "hold":
+        await this.prisma.checkout.updateMany({
+          where: { id: checkout.id, status: "pending" },
+          data: { status: "processing" },
+        });
+        break;
+      case "failure":
+      case "expired":
+      case "reversed":
+        // Після повторної спроби старий рахунок не має перетирати статус нового
+        await this.prisma.checkout.updateMany({
+          where: {
+            id: checkout.id,
+            invoiceId: invoice.invoiceId,
+            status: { in: ["pending", "processing"] },
+          },
+          data: {
+            status: invoice.status === "expired" ? "expired" : "failure",
+          },
+        });
+        break;
+      default:
+        break;
+    }
+
+    return this.prisma.checkout.findUniqueOrThrow({
+      where: { id: checkout.id },
+    });
+  }
+
+  /**
+   * Створює замовлення в KeyCRM і в нашій базі для оплаченої спроби.
+   * Безпечно викликати кілька разів: «захоплення» статусу paid → creating
+   * гарантує, що створенням займається лише один процес.
+   */
+  async completeCheckout(checkoutId: string): Promise<void> {
+    const claimed = await this.prisma.checkout.updateMany({
+      where: { id: checkoutId, status: "paid" },
+      data: { status: "creating" },
+    });
+    if (!claimed.count) {
+      return;
+    }
+
+    const checkout = await this.prisma.checkout.findUniqueOrThrow({
+      where: { id: checkoutId },
+    });
+
+    try {
+      await this.createOrderFromCheckout(checkout);
+    } catch (e) {
+      const message =
+        (e as { response?: { data?: unknown } })?.response?.data !== undefined
+          ? JSON.stringify((e as { response: { data: unknown } }).response.data)
+          : (e as Error).message;
+      this.logger.error(
+        `Failed to create order for paid checkout ${checkoutId}: ${message}`,
+      );
+      // Повернемо в paid — крон спробує ще раз
+      await this.prisma.checkout.update({
+        where: { id: checkoutId },
+        data: { status: "paid", errorMessage: message?.slice(0, 1000) },
+      });
+    }
+  }
+
+  private async createOrderFromCheckout(checkout: Checkout): Promise<void> {
+    const data = checkout.payload as unknown as CreateOrderDto;
+
+    const productsWithPartners = await this.getProductsWithPartners(
+      data.orderProducts,
+    );
+    const productsByPartner = this.groupProductsByPartner(
+      productsWithPartners,
+      data.orderProducts,
+    );
+
+    const crmOrderIds = await this.createOrdersInCrmByPartners(
+      data,
+      productsByPartner,
+      checkout,
+    );
+
+    // Основне замовлення — перше (партнер першого товару), як і раніше
+    const [mainCrmOrderId, ...additionalCrmOrderIds] = crmOrderIds;
+
+    const newOrder = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
         data: {
           firstName: data.firstName,
           secondName: data.secondName,
@@ -138,9 +467,12 @@ export class OrderService {
           messengerType: data.messengerType,
           callCustomer: data.callCustomer,
           comment: data.comment,
-          keyCrmOrderId: mainCrmOrder.id,
-          additionalKeyCrmIds: additionalCrmOrderIds,
+          keyCrmOrderId: mainCrmOrderId,
+          additionalKeyCrmIds: additionalCrmOrderIds.map(String),
           status: "created",
+          paymentStatus: "success",
+          invoiceId: checkout.invoiceId,
+          prepaidAmount: checkout.prepaidAmount,
           city: data.city,
           warehouseAddress: data.warehouseAddress,
           warehouseNumber: data.warehouseNumber,
@@ -158,59 +490,156 @@ export class OrderService {
             },
           },
         },
-        include: {
-          OrderProduct: {
-            include: {
-              Product: {
-                select: {
-                  name: true,
-                  alias: true,
-                  images: true,
-                  partnersId: true,
-                },
-              },
-              ProductSize: true,
-            },
-          },
-        },
       });
-
-      const invoice =
-        data.paymentType === "PREPAY"
-          ? await this.createInvoice({
-              data: newOrder.OrderProduct,
-              orderId: newOrder.id,
-              crmOrderId: mainCrmOrder.id.toString(),
-            })
-          : undefined;
-
-      await this.update(newOrder.id, {
-        invoiceId: invoice?.invoiceId,
+      await tx.checkout.update({
+        where: { id: checkout.id },
+        data: { status: "completed", orderId: order.id, errorMessage: null },
       });
+      return order;
+    });
 
-      if (params.sessionId) {
+    if (checkout.sessionId) {
+      try {
+        await this.basketService.clearBasket(checkout.sessionId);
         const session = await this.redis.get<string>(
-          this.getKey(params.sessionId),
+          this.getKey(checkout.sessionId),
         );
-
         if (!session) {
           await this.redis.set<string>(
-            this.getKey(params.sessionId),
+            this.getKey(checkout.sessionId),
             newOrder.phoneNumber,
             60 * 60 * 24,
           );
         }
+      } catch (e) {
+        this.logger.warn(
+          `Could not update session ${checkout.sessionId}: ${(e as Error).message}`,
+        );
       }
+    }
+  }
 
-      return {
-        message: "Order created successfully.",
-        paymentPageUrl: invoice?.pageUrl,
-        orderId: newOrder.id,
-      };
-    } catch (e) {
-      console.error(e);
+  async getCheckoutStatus(
+    checkoutId: string,
+  ): Promise<CheckoutStatusResponseDto | null> {
+    let checkout = await this.prisma.checkout.findUnique({
+      where: { id: checkoutId },
+    });
+    if (!checkout) {
+      return null;
+    }
 
-      throw new InternalServerErrorException(ErrorModel.INTERNAL_SERVER_ERROR);
+    // Monobank перенаправляє покупця одразу після оплати, webhook може
+    // прийти трохи пізніше — тому звіряємо статус і тут (не частіше ніж раз на 5 с).
+    if (
+      (checkout.status === "pending" || checkout.status === "processing") &&
+      checkout.invoiceId
+    ) {
+      const throttleKey = `checkout-sync:${checkout.id}`;
+      const recentlySynced = await this.redis.get<boolean>(throttleKey);
+      if (!recentlySynced) {
+        await this.redis.set<boolean>(throttleKey, true, 5);
+        try {
+          checkout = await this.syncCheckoutPayment(checkout);
+        } catch (e) {
+          this.logger.warn(
+            `Could not sync checkout ${checkout.id}: ${(e as Error).message}`,
+          );
+        }
+      }
+    }
+
+    const order = checkout.orderId
+      ? await this.findOne({ where: { id: checkout.orderId } })
+      : null;
+
+    return {
+      id: checkout.id,
+      status: checkout.status as CheckoutStatusResponseDto["status"],
+      paymentType: checkout.paymentType,
+      totalAmount: checkout.totalAmount,
+      prepaidAmount: checkout.prepaidAmount,
+      orderId: checkout.orderId,
+      order,
+    };
+  }
+
+  async retryCheckoutPayment(
+    checkoutId: string,
+  ): Promise<RetryOrderResponseDto | null> {
+    let checkout = await this.prisma.checkout.findUnique({
+      where: { id: checkoutId },
+    });
+    if (!checkout) {
+      return null;
+    }
+
+    if (checkout.status === "pending" && checkout.invoiceId) {
+      checkout = await this.syncCheckoutPayment(checkout);
+    }
+
+    if (!RETRYABLE_CHECKOUT_STATUSES.includes(checkout.status)) {
+      throw new BadRequestException(ErrorModel.INTERNAL_SERVER_ERROR);
+    }
+
+    // Старий неоплачений рахунок скасовуємо, щоб не було подвійної оплати
+    if (checkout.status === "pending" && checkout.invoiceId) {
+      await this.removeMonobankInvoice(checkout.invoiceId);
+    }
+
+    const invoice = await this.createCheckoutInvoice(checkout);
+    await this.prisma.checkout.update({
+      where: { id: checkout.id },
+      data: { invoiceId: invoice.invoiceId, status: "pending" },
+    });
+
+    return {
+      message: "Invoice has been created",
+      paymentPageUrl: invoice.pageUrl,
+    };
+  }
+
+  /** Для крону: дотворити замовлення для оплачених, але не створених спроб. */
+  async retryPaidCheckouts(): Promise<void> {
+    const staleCreatingBefore = new Date(Date.now() - 15 * 60 * 1000);
+    // «creating», що висить довго — процес упав посеред створення
+    await this.prisma.checkout.updateMany({
+      where: { status: "creating", updatedAt: { lt: staleCreatingBefore } },
+      data: { status: "paid" },
+    });
+
+    const paid = await this.prisma.checkout.findMany({
+      where: { status: "paid" },
+      take: 20,
+      orderBy: { paidAt: "asc" },
+    });
+    for (const checkout of paid) {
+      await this.completeCheckout(checkout.id);
+    }
+  }
+
+  /** Для крону: звірити неоплачені спроби з Monobank, якщо webhook загубився. */
+  async syncPendingCheckouts(): Promise<void> {
+    const pending = await this.prisma.checkout.findMany({
+      where: {
+        status: { in: ["pending", "processing"] },
+        invoiceId: { not: null },
+        createdAt: {
+          gt: new Date(Date.now() - (INVOICE_VALIDITY_SECONDS + 3600) * 1000),
+        },
+        updatedAt: { lt: new Date(Date.now() - 5 * 60 * 1000) },
+      },
+      take: 50,
+      orderBy: { createdAt: "desc" },
+    });
+    for (const checkout of pending) {
+      try {
+        await this.syncCheckoutPayment(checkout);
+      } catch (e) {
+        this.logger.warn(
+          `Could not sync checkout ${checkout.id}: ${(e as Error).message}`,
+        );
+      }
     }
   }
 
@@ -229,7 +658,13 @@ export class OrderService {
         id: orderId,
       },
     });
-    if (!order || order.paymentStatus === "canceled") {
+    // Нові замовлення (prepaidAmount != null) створюються вже оплаченими —
+    // для них повторний рахунок не потрібен
+    if (
+      !order ||
+      order.paymentStatus === "canceled" ||
+      order.prepaidAmount !== null
+    ) {
       return null;
     }
 
@@ -357,27 +792,87 @@ export class OrderService {
     return productsByPartner;
   }
 
+  /**
+   * Створює замовлення в CRM кожного партнера і повертає їхні id
+   * (у порядку партнерів). Уже створені для цієї спроби замовлення
+   * (checkout.crmOrderIds) не створюються вдруге.
+   */
   private async createOrdersInCrmByPartners(
     orderData: CreateOrderDto,
     productsByPartner: Map<string, PartnerWithProducts>,
-  ): Promise<CrmOrderResponse[]> {
-    const crmOrders: CrmOrderResponse[] = [];
+    checkout: Checkout,
+  ): Promise<number[]> {
+    const crmOrderIds: number[] = [];
+    const createdCrmOrderIds: Record<string, number> = {
+      ...((checkout.crmOrderIds as Record<string, number> | null) ?? {}),
+    };
     const isMultiPartnerOrder = productsByPartner.size > 1;
     const orderType = isMultiPartnerOrder
       ? "Об'єднане замовлення"
       : "Єдине замовлення";
 
-    for (const [, { partner, products }] of productsByPartner) {
+    // Сплачену онлайн суму розподіляємо по замовленнях партнерів по черзі
+    let prepaidLeft = checkout.prepaidAmount;
+
+    for (const [partnerId, { partner, products }] of productsByPartner) {
+      const partnerTotal = this.calculateTotal(products);
+      const prepaidForPartner = Math.min(prepaidLeft, partnerTotal);
+      prepaidLeft -= prepaidForPartner;
+
+      if (createdCrmOrderIds[partnerId]) {
+        crmOrderIds.push(createdCrmOrderIds[partnerId]);
+        continue;
+      }
+
       const crmOrder = await this.createOrderInCrmForPartner(
         orderData,
         products,
         partner,
         orderType,
+        {
+          totalSum: partnerTotal,
+          prepaidAmount: prepaidForPartner,
+          invoiceId: checkout.invoiceId,
+        },
       );
-      crmOrders.push(crmOrder);
+      crmOrderIds.push(crmOrder.id);
+      createdCrmOrderIds[partnerId] = crmOrder.id;
+      await this.prisma.checkout.update({
+        where: { id: checkout.id },
+        data: { crmOrderIds: createdCrmOrderIds },
+      });
     }
 
-    return crmOrders;
+    return crmOrderIds;
+  }
+
+  private buildCrmPayments(
+    partner: Partners,
+    payment: { totalSum: number; prepaidAmount: number; invoiceId: string },
+  ) {
+    const payments: CreateOrderCrmDto["payments"] = [];
+    // Платежі створюються як not_paid: крон прив'язує до передоплати
+    // транзакцію Monobank, і KeyCRM сам позначає її оплаченою.
+    if (payment.prepaidAmount > 0) {
+      payments.push({
+        payment_method_id: partner.prePayId,
+        payment_method: "Передоплата",
+        amount: payment.prepaidAmount,
+        description: `Сплачено онлайн через Monobank, рахунок ${payment.invoiceId}`,
+        status: "not_paid",
+      });
+    }
+    const restAmount = payment.totalSum - payment.prepaidAmount;
+    if (restAmount > 0) {
+      payments.push({
+        payment_method_id: partner.postPayId,
+        payment_method: "Оплата при отриманні",
+        amount: restAmount,
+        description: "",
+        status: "not_paid",
+      });
+    }
+    return payments;
   }
 
   private async createOrderInCrmForPartner(
@@ -385,6 +880,7 @@ export class OrderService {
     products: OrderProductWithData[],
     partner: Partners,
     orderType: string,
+    payment: { totalSum: number; prepaidAmount: number; invoiceId: string },
   ): Promise<CrmOrderResponse> {
     const typeMessenger = {
       TELEGRAM: "Телеграм",
@@ -393,22 +889,16 @@ export class OrderService {
       INSTAGRAM: "Instagram",
     };
 
-    const totalSum = products.reduce(
-      (acc, item) =>
-        acc +
-        Math.round(item.price - (item.price * item.discount) / 100) *
-          item.quantity,
-      0,
-    );
+    const restAmount = payment.totalSum - payment.prepaidAmount;
 
     const messageMessenger =
       data.messengerType !== "EMAIL"
         ? `${typeMessenger[data.messengerType]}: ${data.messenger}`
         : "";
     const messagePayment =
-      data.paymentType === "PREPAY"
-        ? "Тип отплати: Передоплата"
-        : "Тип отплати: Оплата при отриманні";
+      data.paymentType === PaymentType.PREPAY
+        ? `Тип оплати: Повна оплата онлайн (сплачено ${payment.prepaidAmount} грн)`
+        : `Тип оплати: Передоплата ${payment.prepaidAmount} грн онлайн (сплачено), решта ${restAmount} грн — при отриманні`;
     const messageCall = data.callCustomer
       ? "Телефонувати клієнту"
       : "Не телефонувати клієнту";
@@ -458,21 +948,7 @@ export class OrderService {
           },
         ],
       })),
-      payments: [
-        {
-          payment_method_id:
-            data.paymentType === "PREPAY"
-              ? partner.prePayId
-              : partner.postPayId,
-          payment_method:
-            data.paymentType === "PREPAY"
-              ? "Передоплата"
-              : "Оплата при отриманні",
-          amount: totalSum,
-          description: "",
-          status: "not_paid",
-        },
-      ],
+      payments: this.buildCrmPayments(partner, payment),
       marketing: data.marketing,
     };
 
@@ -564,10 +1040,7 @@ export class OrderService {
       invoiceId: string;
       pageUrl: string;
     }>("/merchant/invoice/create", bodyInvoice, {
-      baseURL: this.configService.get("MONOBANK_API_URL"),
-      headers: {
-        "X-Token": this.configService.get("MONOBANK_API_KEY"),
-      },
+      ...this.monobankRequestConfig(),
     });
     return response.data;
   }
@@ -617,7 +1090,34 @@ export class OrderService {
   }
 
   async orderCallback(data: OrderCallbackCreateDto) {
+    // Нові рахунки мають reference = id спроби оформлення (Checkout)
+    const checkout = data?.reference
+      ? await this.prisma.checkout.findUnique({
+          where: { id: String(data.reference) },
+        })
+      : null;
+    if (checkout) {
+      try {
+        await this.syncCheckoutPayment(checkout, data.invoiceId);
+        return "OK";
+      } catch (e) {
+        this.logger.error(e);
+        // 5xx — Monobank повторить webhook
+        throw new InternalServerErrorException(
+          ErrorModel.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+
+    return this.legacyOrderCallback(data);
+  }
+
+  // Рахунки, виставлені до впровадження передоплати (reference = keyCrmOrderId)
+  private async legacyOrderCallback(data: OrderCallbackCreateDto) {
     try {
+      if (!/^\d+$/.test(String(data?.reference ?? ""))) {
+        return "OK";
+      }
       console.log("Order callback data:", data);
       const order = await this.prisma.order.findUnique({
         where: {

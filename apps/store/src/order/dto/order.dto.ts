@@ -207,6 +207,15 @@ export class OrderDto {
   paymentStatus: string;
 
   @ApiProperty({
+    description:
+      "Amount paid online before the order was created, UAH (full sum or the minimum prepayment). Null for orders created before the prepayment flow.",
+    example: 200,
+    nullable: true,
+    type: Number,
+  })
+  prepaidAmount: number | null;
+
+  @ApiProperty({
     description: "Timestamp when the order was created",
     example: "2025-06-18T20:34:00Z",
   })

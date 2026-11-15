@@ -173,6 +173,7 @@ model Order {
   warehouseNumber     String
   warehouseType       String
   additionalKeyCrmIds String[]       @default([])
+  prepaidAmount       Int?
   utmSource           String?
   utmMedium           String?
   utmCampaign         String?
@@ -224,4 +225,27 @@ model Partners {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   Product           Product[]
+}
+
+// Спроба оформлення: зберігає дані замовлення до підтвердження оплати Monobank.
+// Order і замовлення в KeyCRM створюються лише після успішної оплати.
+model Checkout {
+  id            String    @id @default(cuid())
+  sessionId     String?
+  paymentType   String
+  totalAmount   Int
+  prepaidAmount Int
+  payload       Json
+  invoiceId     String?   @unique
+  // pending | processing | paid | creating | completed | failure | expired
+  status        String    @default("pending")
+  orderId       String?   @unique
+  // { [partnerId]: keyCrmOrderId } — щоб повтор після збою не дублював замовлення в CRM
+  crmOrderIds   Json?
+  errorMessage  String?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
 }

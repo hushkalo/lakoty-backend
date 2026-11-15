@@ -19,6 +19,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import {
+  CheckoutStatusResponseDto,
   CreateOrderResponseDto,
   MyOrdersDto,
   OrderResponseDto,
@@ -35,10 +36,13 @@ import { CallbackRequestBodyDto } from "./dto/callback.dto";
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
-  @ApiOperation({ summary: "Create new order" })
+  @ApiOperation({
+    summary:
+      "Start checkout: returns a Monobank payment page. The order is created only after the payment is confirmed (full sum for PREPAY, minimum 200 UAH prepayment for POSTPAY).",
+  })
   @ApiResponse({
     status: 201,
-    description: "The order has been successfully created.",
+    description: "Checkout created, waiting for payment.",
     type: CreateOrderResponseDto,
   })
   @ApiBadRequestResponse({
@@ -186,6 +190,38 @@ export class OrderController {
     @Param("id") orderId: string,
   ): Promise<RetryOrderResponseDto> {
     return this.orderService.retryPayment(orderId);
+  }
+
+  @ApiOperation({
+    summary:
+      "Get checkout payment status (and the created order once it is paid)",
+  })
+  @ApiResponse({
+    status: 200,
+    type: CheckoutStatusResponseDto,
+    schema: { nullable: true },
+  })
+  @ApiParam({ name: "id", required: true, description: "The checkout id" })
+  @Get("checkout/:id")
+  getCheckoutStatus(
+    @Param("id") checkoutId: string,
+  ): Promise<CheckoutStatusResponseDto | null> {
+    return this.orderService.getCheckoutStatus(checkoutId);
+  }
+
+  @ApiOperation({
+    summary: "Create a new Monobank invoice for an unpaid checkout",
+  })
+  @ApiResponse({
+    status: 201,
+    type: RetryOrderResponseDto,
+  })
+  @ApiParam({ name: "id", required: true, description: "The checkout id" })
+  @Post("checkout/:id/retry")
+  retryCheckoutPayment(
+    @Param("id") checkoutId: string,
+  ): Promise<RetryOrderResponseDto | null> {
+    return this.orderService.retryCheckoutPayment(checkoutId);
   }
 
   @ApiOperation({
