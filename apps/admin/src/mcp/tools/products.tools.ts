@@ -8,6 +8,7 @@ import { CreateColorsDto } from "../../products/dto/color.dto";
 import { CreateVariantGroupDto } from "../../products/dto/create-variant-group.dto";
 import { McpUserService } from "../mcp-user.service";
 import { KeyCrmClient } from "../keycrm.client";
+import { PrismaService } from "@libs/prisma-client";
 import {
   dtoPayload,
   paginationShape,
@@ -26,6 +27,7 @@ export class ProductsMcpTools {
     private readonly productsService: ProductsService,
     private readonly mcpUser: McpUserService,
     private readonly keyCrm: KeyCrmClient,
+    private readonly prisma: PrismaService,
   ) {}
 
   register(server: McpServer, userId?: string) {
@@ -212,6 +214,39 @@ export class ProductsMcpTools {
     );
 
     server.registerTool(
+      "sync_skus_from_crm",
+      {
+        description:
+          "Fill missing SKUs (артикул) of shop products and their sizes from KeyCRM. " +
+          "Without ids/aliases it takes every shop product linked to KeyCRM that has an empty product or size SKU. " +
+          "Sizes are matched by KeyCRM offer id, then by size name. Existing SKUs are kept unless overwrite is true. " +
+          "Use dryRun to preview.",
+        inputSchema: {
+          ids: z.array(z.string()).optional().describe("Shop product ids"),
+          aliases: z.array(z.string()).optional(),
+          partnerId: z
+            .string()
+            .optional()
+            .describe("Only this partner's products"),
+          overwrite: z
+            .boolean()
+            .optional()
+            .describe("Replace SKUs that differ from KeyCRM (default false)"),
+          dryRun: z.boolean().optional().describe("Only report changes"),
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            .describe("Default 200"),
+        },
+        annotations: { destructiveHint: false, idempotentHint: true },
+      },
+      (params) => runTool(() => this.syncSkus(params)),
+    );
+
+    server.registerTool(
       "create_product",
       {
         description:
@@ -337,4 +372,204 @@ export class ProductsMcpTools {
         ),
     );
   }
+
+  private async syncSkus(params: {
+    ids?: string[];
+    aliases?: string[];
+    partnerId?: string;
+    overwrite?: boolean;
+    dryRun?: boolean;
+    limit?: number;
+  }) {
+    const {
+      ids,
+      aliases,
+      partnerId,
+      overwrite = false,
+      dryRun = false,
+    } = params;
+    const emptySku = [{ sku: null }, { sku: "" }];
+    const products = await this.prisma.product.findMany({
+      where: {
+        isDeleted: false,
+        keyCrmId: { not: null },
+        partnersId: partnerId ? partnerId : { not: null },
+        ...(!!(ids?.length || aliases?.length) && {
+          OR: [
+            ...(ids?.length ? [{ id: { in: ids } }] : []),
+            ...(aliases?.length ? [{ alias: { in: aliases } }] : []),
+          ],
+        }),
+        ...(!overwrite &&
+          !ids?.length &&
+          !aliases?.length && {
+            AND: [
+              {
+                OR: [...emptySku, { productSizes: { some: { OR: emptySku } } }],
+              },
+            ],
+          }),
+      },
+      select: {
+        id: true,
+        name: true,
+        alias: true,
+        sku: true,
+        keyCrmId: true,
+        partnersId: true,
+        productSizes: {
+          select: { id: true, name: true, sku: true, keyCrmId: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: params.limit ?? 200,
+    });
+
+    const byPartner = new Map<string, typeof products>();
+    for (const product of products) {
+      const list = byPartner.get(product.partnersId) ?? [];
+      list.push(product);
+      byPartner.set(product.partnersId, list);
+    }
+
+    const updated: unknown[] = [];
+    const notInCrm: { alias: string; keyCrmId: number }[] = [];
+    let unchanged = 0;
+
+    for (const [pid, partnerProducts] of byPartner) {
+      const partner = await this.keyCrm.partner(pid);
+      const crmProducts = new Map<number, { id: number; sku: string | null }>();
+      const crmOffers = new Map<
+        number,
+        { id: number; sku: string | null; properties?: { value: string }[] }[]
+      >();
+
+      for (let i = 0; i < partnerProducts.length; i += SKU_BATCH) {
+        const keyCrmIds = partnerProducts
+          .slice(i, i + SKU_BATCH)
+          .map((p) => p.keyCrmId);
+        const filter = keyCrmIds.join(",");
+        const [crmList, offers] = await Promise.all([
+          this.keyCrm.listAll<{ id: number; sku: string | null }>(
+            partner,
+            `/products?filter[product_id]=${filter}`,
+          ),
+          this.keyCrm.listAll<{
+            id: number;
+            product_id: number;
+            sku: string | null;
+            properties?: { value: string }[];
+          }>(partner, `/offers?filter[product_id]=${filter}`),
+        ]);
+        const wanted = new Set(keyCrmIds);
+        for (const item of crmList) {
+          if (wanted.has(item.id)) crmProducts.set(item.id, item);
+        }
+        for (const offer of offers) {
+          if (!wanted.has(offer.product_id)) continue;
+          const list = crmOffers.get(offer.product_id) ?? [];
+          list.push(offer);
+          crmOffers.set(offer.product_id, list);
+        }
+        // The list filter may be ignored by KeyCRM; fetch the rest one by one.
+        for (const keyCrmId of keyCrmIds) {
+          if (crmProducts.has(keyCrmId)) continue;
+          try {
+            crmProducts.set(
+              keyCrmId,
+              await this.keyCrm.request(
+                partner,
+                "GET",
+                `/products/${keyCrmId}`,
+              ),
+            );
+          } catch {
+            // reported as notInCrm below
+          }
+        }
+      }
+
+      for (const product of partnerProducts) {
+        const crmProduct = crmProducts.get(product.keyCrmId);
+        if (!crmProduct) {
+          notInCrm.push({ alias: product.alias, keyCrmId: product.keyCrmId });
+          continue;
+        }
+        const shouldSet = (current: string | null, next: string | null) =>
+          !!next?.trim() &&
+          current !== next.trim() &&
+          (overwrite || !current?.trim());
+
+        const productSku = shouldSet(product.sku, crmProduct.sku)
+          ? crmProduct.sku.trim()
+          : undefined;
+        const offers = crmOffers.get(product.keyCrmId) ?? [];
+        const sizeChanges = product.productSizes.flatMap((size) => {
+          const offer =
+            offers.find((o) => o.id === size.keyCrmId) ??
+            offers.find(
+              (o) =>
+                o.properties?.[0]?.value?.trim().toLowerCase() ===
+                size.name.trim().toLowerCase(),
+            );
+          return offer && shouldSet(size.sku, offer.sku)
+            ? [
+                {
+                  id: size.id,
+                  name: size.name,
+                  from: size.sku,
+                  sku: offer.sku.trim(),
+                },
+              ]
+            : [];
+        });
+
+        if (productSku === undefined && !sizeChanges.length) {
+          unchanged++;
+          continue;
+        }
+        if (!dryRun) {
+          await this.prisma.$transaction([
+            ...(productSku !== undefined
+              ? [
+                  this.prisma.product.update({
+                    where: { id: product.id },
+                    data: { sku: productSku },
+                  }),
+                ]
+              : []),
+            ...sizeChanges.map((change) =>
+              this.prisma.productSize.update({
+                where: { id: change.id },
+                data: { sku: change.sku },
+              }),
+            ),
+          ]);
+        }
+        updated.push({
+          name: product.name,
+          alias: product.alias,
+          ...(productSku !== undefined && {
+            sku: { from: product.sku, to: productSku },
+          }),
+          sizes: sizeChanges.map(({ name, from, sku }) => ({
+            name,
+            from,
+            to: sku,
+          })),
+        });
+      }
+    }
+
+    return {
+      dryRun,
+      checked: products.length,
+      updated: updated.length,
+      unchanged,
+      notInCrm,
+      changes: updated,
+    };
+  }
 }
+
+const SKU_BATCH = 50;
