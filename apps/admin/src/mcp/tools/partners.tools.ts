@@ -5,6 +5,19 @@ import { PartnerService } from "../../partners/partner.service";
 import { CreatePartnerDto } from "../../partners/dto/create-partner.dto";
 import { UpdatePartnerDto } from "../../partners/dto/update-partner.dto";
 import { KeyCrmClient } from "../keycrm.client";
+import { PrismaService } from "@libs/prisma-client";
+import {
+  type TCategory,
+  type TOffer,
+  type TProduct,
+} from "../../partners/dto/partner-api.dto";
+import { transliteration } from "../../utils/transliteration.util";
+
+/** Same exclusion as the admin "upload products" import. */
+const EXCLUDED_CRM_CATEGORIES = [45];
+const IMPORT_MAX_PAGES = 200;
+
+const aliasBase = (name: string) => transliteration(name) || "product";
 import {
   dtoPayload,
   paginationShape,
@@ -84,6 +97,7 @@ export class PartnersMcpTools {
   constructor(
     private readonly partnerService: PartnerService,
     private readonly keyCrm: KeyCrmClient,
+    private readonly prisma: PrismaService,
   ) {}
 
   register(server: McpServer) {
@@ -235,6 +249,44 @@ export class PartnersMcpTools {
     );
 
     server.registerTool(
+      "import_crm_products",
+      {
+        description:
+          "Create shop products for KeyCRM products of a partner that are not in the shop yet " +
+          "(name, description, price, SKU, photos, sizes). Existing shop products are not changed. " +
+          "Skips archived CRM products and products whose CRM category is not linked to a shop category " +
+          "(category keyCrmId); the result lists every skipped product with the reason. " +
+          "Run with dryRun first to preview; hidden: true creates the new products hidden from the shop.",
+        inputSchema: {
+          id: z.string().describe("Partner id"),
+          dryRun: z
+            .boolean()
+            .optional()
+            .describe("Only report what would be created"),
+          hidden: z
+            .boolean()
+            .optional()
+            .describe(
+              "Create new products hidden from the shop (default false)",
+            ),
+          keyCrmIds: z
+            .array(z.number().int().positive())
+            .optional()
+            .describe("Only these KeyCRM product ids"),
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(200)
+            .optional()
+            .describe("Max products to create in one run (default 50)"),
+        },
+        annotations: { destructiveHint: false },
+      },
+      (params) => runTool(() => this.importProducts(params)),
+    );
+
+    server.registerTool(
       "delete_partner",
       {
         description: "Delete a partner by id.",
@@ -243,6 +295,213 @@ export class PartnersMcpTools {
       },
       ({ id }) => runTool(() => this.partnerService.remove({ where: { id } })),
     );
+  }
+
+  private async importProducts(params: {
+    id: string;
+    dryRun?: boolean;
+    hidden?: boolean;
+    keyCrmIds?: number[];
+    limit?: number;
+  }) {
+    const { dryRun = false, hidden = false, keyCrmIds } = params;
+    const limit = params.limit ?? 50;
+    const partner = await this.keyCrm.partner(params.id);
+
+    const [crmCategories, crmProducts] = await Promise.all([
+      this.keyCrm.listAll<TCategory>(partner, "/products/categories"),
+      keyCrmIds?.length
+        ? this.listByIds<TProduct>(partner, "/products", keyCrmIds)
+        : this.keyCrm.listAll<TProduct>(partner, "/products", IMPORT_MAX_PAGES),
+    ]);
+    const crmCategoryName = new Map(crmCategories.map((c) => [c.id, c.name]));
+
+    const [shopCategories, existing] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { keyCrmId: { not: null } },
+        select: { id: true, name: true, keyCrmId: true, isDeleted: true },
+        orderBy: { isDeleted: "asc" },
+      }),
+      this.prisma.product.findMany({
+        where: {
+          partnersId: partner.id,
+          keyCrmId: { in: crmProducts.map((p) => p.id) },
+        },
+        select: { keyCrmId: true },
+      }),
+    ]);
+    const categoryByCrmId = new Map<number, (typeof shopCategories)[number]>();
+    for (const category of shopCategories) {
+      if (!categoryByCrmId.has(category.keyCrmId)) {
+        categoryByCrmId.set(category.keyCrmId, category);
+      }
+    }
+    const existingIds = new Set(existing.map((p) => p.keyCrmId));
+
+    const skipped: { name: string; keyCrmId: number; reason: string }[] = [];
+    const toCreate: {
+      product: TProduct;
+      category: (typeof shopCategories)[number];
+    }[] = [];
+    let alreadyInShop = 0;
+    for (const product of crmProducts) {
+      if (existingIds.has(product.id)) {
+        alreadyInShop++;
+        continue;
+      }
+      const skip = (reason: string) =>
+        skipped.push({ name: product.name, keyCrmId: product.id, reason });
+      if (product.is_archived) {
+        skip("archived in KeyCRM");
+        continue;
+      }
+      if (EXCLUDED_CRM_CATEGORIES.includes(product.category_id)) {
+        skip(`excluded KeyCRM category ${product.category_id}`);
+        continue;
+      }
+      const category = categoryByCrmId.get(product.category_id);
+      if (!category) {
+        skip(
+          `KeyCRM category "${crmCategoryName.get(product.category_id) ?? "?"}" ` +
+            `(${product.category_id}) is not linked to a shop category`,
+        );
+        continue;
+      }
+      toCreate.push({ product, category });
+    }
+    const batch = toCreate.slice(0, limit);
+
+    const offers = batch.length
+      ? await this.listByIds<TOffer>(
+          partner,
+          "/offers",
+          batch.map(({ product }) => product.id),
+        )
+      : [];
+    const sizesOf = (productId: number) =>
+      offers
+        .filter((o) => o.product_id === productId && o.properties?.length)
+        .map((o) => ({
+          keyCrmId: o.id,
+          name: o.properties[0].value,
+          quantity: o.quantity,
+          isAvailable: true,
+          sku: o.sku,
+        }));
+
+    const usedAliases = new Set(
+      (
+        await this.prisma.product.findMany({
+          where: {
+            OR: batch.map(({ product }) => ({
+              alias: { startsWith: aliasBase(product.name) },
+            })),
+          },
+          select: { alias: true },
+        })
+      ).map((p) => p.alias),
+    );
+    const uniqueAlias = (name: string) => {
+      const base = aliasBase(name);
+      let alias = base;
+      for (let n = 2; usedAliases.has(alias); n++) alias = `${base}-${n}`;
+      usedAliases.add(alias);
+      return alias;
+    };
+
+    const created: unknown[] = [];
+    const failed: { name: string; keyCrmId: number; error: string }[] = [];
+    for (const { product, category } of batch) {
+      const sizes = sizesOf(product.id);
+      const alias = uniqueAlias(product.name);
+      const summary = {
+        name: product.name,
+        keyCrmId: product.id,
+        alias,
+        category: category.name,
+        price: product.max_price,
+        sku: product.sku,
+        photos: product.attachments_data?.length ?? 0,
+        sizes: sizes.map((s) => s.name),
+        hidden,
+      };
+      if (dryRun) {
+        created.push(summary);
+        continue;
+      }
+      try {
+        const shopProduct = await this.prisma.product.create({
+          data: {
+            name: product.name,
+            description: product.description,
+            price: product.max_price,
+            discount: 0,
+            alias,
+            sku: product.sku,
+            quantity: product.quantity,
+            hidden,
+            keyCrmId: product.id,
+            createdAt: new Date(product.created_at),
+            category: { connect: { id: category.id } },
+            Partner: { connect: { id: partner.id } },
+            images: {
+              create: (product.attachments_data ?? []).map((url, order) => ({
+                url,
+                order,
+              })),
+            },
+            productSizes: { create: sizes },
+          },
+          select: { id: true },
+        });
+        created.push({ id: shopProduct.id, ...summary });
+      } catch (error) {
+        failed.push({
+          name: product.name,
+          keyCrmId: product.id,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    return {
+      partner: partner.name,
+      dryRun,
+      crmProducts: crmProducts.length,
+      alreadyInShop,
+      [dryRun ? "wouldCreate" : "created"]: created,
+      remainingNew: toCreate.length - batch.length,
+      skipped,
+      failed,
+    };
+  }
+
+  /** Lists KeyCRM products or offers of the given product ids, 50 ids per request. */
+  private async listByIds<T>(
+    partner: Awaited<ReturnType<KeyCrmClient["partner"]>>,
+    path: string,
+    ids: number[],
+  ): Promise<T[]> {
+    const items: T[] = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      const chunk = ids.slice(i, i + 50);
+      const page = await this.keyCrm.listAll<T & { id: number }>(
+        partner,
+        `${path}?filter[product_id]=${chunk.join(",")}`,
+      );
+      // Guard against KeyCRM ignoring the filter.
+      const wanted = new Set(chunk);
+      items.push(
+        ...page.filter((item) =>
+          wanted.has(
+            path === "/offers"
+              ? (item as unknown as TOffer).product_id
+              : item.id,
+          ),
+        ),
+      );
+    }
+    return items;
   }
 
   /** Loads the KeyCRM option lists needed for the given settings (shared paths fetched once). */
