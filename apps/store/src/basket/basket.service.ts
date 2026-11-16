@@ -2,6 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { RedisService } from "../redis/redis.service";
 import { BasketItemDto } from "./dto/basket.dto";
 
+// Кошик живе стільки ж, скільки cookie sessionId на фронтенді (7 днів),
+// і строк продовжується при кожному читанні. Раніше ключ жив 3 години від
+// останньої зміни: відкрита сторінка checkout ще показувала товари, а після
+// повернення з оплати Monobank кошик виявлявся порожнім.
+const BASKET_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 @Injectable()
 export class BasketService {
   constructor(private readonly redis: RedisService) {}
@@ -18,11 +24,12 @@ export class BasketService {
       return [];
     }
 
+    await this.redis.expire(this.getKey(sessionId), BASKET_TTL_SECONDS);
     return data;
   }
 
   async setBasket(sessionId: string, items: BasketItemDto[]) {
-    await this.redis.set(this.getKey(sessionId), items, 3 * 60 * 60);
+    await this.redis.set(this.getKey(sessionId), items, BASKET_TTL_SECONDS);
   }
 
   async clearBasket(sessionId: string): Promise<void> {
